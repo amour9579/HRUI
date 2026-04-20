@@ -4,7 +4,7 @@ function ns:CreateDiceOptions()
     return {
         type = "group",
         name = "주사위",
-        order = 7,
+        order = 8,
         args = {
             header = {
                 type = "header",
