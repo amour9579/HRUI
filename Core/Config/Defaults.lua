@@ -120,6 +120,14 @@ ns.Defaults = {
         chat = {
             enabled = true,
 
+            autoGreeting = {
+                enabled = true,
+                joinEnabled = true,
+                joinMessage = "안녕하세요!",
+                challengeCompletedEnabled = true,
+                challengeCompletedMessage = "수고하셨습니다!",
+            },
+
             infoBar = {
                 enabled = true,
                 width = 483,

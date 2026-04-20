@@ -1,0 +1,196 @@
+local _, ns = ...
+
+local AutoGreeting = {}
+ns.AutoGreeting = AutoGreeting
+
+AutoGreeting.eventsRegistered = false
+AutoGreeting.wasInGreetingGroup = false
+AutoGreeting.pendingJoinTimer = nil
+AutoGreeting.pendingCompletionTimer = nil
+
+local EVENT_PREFIX = "AutoGreeting_"
+local DEFAULT_JOIN_MESSAGE = "안녕하세요!"
+local DEFAULT_CHALLENGE_COMPLETED_MESSAGE = "수고하셨습니다!"
+
+local function GetDB()
+    ns.db.profile.chat = ns.db.profile.chat or {}
+    ns.db.profile.chat.autoGreeting = ns.db.profile.chat.autoGreeting or {
+        enabled = true,
+        joinEnabled = true,
+        joinMessage = DEFAULT_JOIN_MESSAGE,
+        challengeCompletedEnabled = true,
+        challengeCompletedMessage = DEFAULT_CHALLENGE_COMPLETED_MESSAGE,
+    }
+
+    local db = ns.db.profile.chat.autoGreeting
+
+    if db.enabled == nil then
+        db.enabled = true
+    end
+
+    if db.joinEnabled == nil then
+        db.joinEnabled = true
+    end
+
+    if db.challengeCompletedEnabled == nil then
+        db.challengeCompletedEnabled = true
+    end
+
+    if db.joinMessage == nil or db.joinMessage == "" then
+        db.joinMessage = DEFAULT_JOIN_MESSAGE
+    end
+
+    if db.challengeCompletedMessage == nil or db.challengeCompletedMessage == "" then
+        db.challengeCompletedMessage = DEFAULT_CHALLENGE_COMPLETED_MESSAGE
+    end
+
+    return db
+end
+
+local function TrimMessage(message)
+    if type(message) ~= "string" then
+        return ""
+    end
+
+    return (message:gsub("^%s+", ""):gsub("%s+$", ""))
+end
+
+function AutoGreeting:GetGroupChannel()
+    if IsInGroup(LE_PARTY_CATEGORY_INSTANCE) then
+        return "INSTANCE_CHAT"
+    end
+
+    if IsInGroup() and not IsInRaid() then
+        return "PARTY"
+    end
+
+    return nil
+end
+
+function AutoGreeting:IsInGreetingGroup()
+    return self:GetGroupChannel() ~= nil
+end
+
+function AutoGreeting:CancelJoinTimer()
+    if self.pendingJoinTimer then
+        self.pendingJoinTimer:Cancel()
+        self.pendingJoinTimer = nil
+    end
+end
+
+function AutoGreeting:CancelCompletionTimer()
+    if self.pendingCompletionTimer then
+        self.pendingCompletionTimer:Cancel()
+        self.pendingCompletionTimer = nil
+    end
+end
+
+function AutoGreeting:SendMessage(channel, message)
+    local trimmedMessage = TrimMessage(message)
+    if not channel or trimmedMessage == "" then
+        return
+    end
+
+    SendChatMessage(trimmedMessage, channel)
+end
+
+function AutoGreeting:ScheduleJoinGreeting()
+    local db = GetDB()
+    if not db.enabled or not db.joinEnabled then
+        return
+    end
+
+    self:CancelJoinTimer()
+
+    self.pendingJoinTimer = C_Timer.NewTimer(2, function()
+        self.pendingJoinTimer = nil
+
+        local channel = self:GetGroupChannel()
+        if not channel then
+            return
+        end
+
+        self:SendMessage(channel, GetDB().joinMessage)
+    end)
+end
+
+function AutoGreeting:ScheduleChallengeCompletedGreeting()
+    local db = GetDB()
+    if not db.enabled or not db.challengeCompletedEnabled then
+        return
+    end
+
+    self:CancelCompletionTimer()
+
+    self.pendingCompletionTimer = C_Timer.NewTimer(2, function()
+        self.pendingCompletionTimer = nil
+
+        local channel = self:GetGroupChannel()
+        if not channel then
+            return
+        end
+
+        self:SendMessage(channel, GetDB().challengeCompletedMessage)
+    end)
+end
+
+function AutoGreeting:OnGroupRosterUpdate()
+    local isInGreetingGroup = self:IsInGreetingGroup()
+
+    if isInGreetingGroup and not self.wasInGreetingGroup then
+        self:ScheduleJoinGreeting()
+    elseif not isInGreetingGroup then
+        self:CancelJoinTimer()
+    end
+
+    self.wasInGreetingGroup = isInGreetingGroup
+end
+
+function AutoGreeting:OnChallengeModeCompleted()
+    self:ScheduleChallengeCompletedGreeting()
+end
+
+function AutoGreeting:RegisterEvents()
+    if self.eventsRegistered or not ns.Event then
+        return
+    end
+
+    ns.Event:Register("GROUP_ROSTER_UPDATE", EVENT_PREFIX .. "GroupRosterUpdate", function()
+        AutoGreeting:OnGroupRosterUpdate()
+    end)
+
+    ns.Event:Register("CHALLENGE_MODE_COMPLETED", EVENT_PREFIX .. "ChallengeModeCompleted", function()
+        AutoGreeting:OnChallengeModeCompleted()
+    end)
+
+    self.eventsRegistered = true
+end
+
+function AutoGreeting:UnregisterEvents()
+    if ns.Event and ns.Event.UnregisterPrefix then
+        ns.Event:UnregisterPrefix(EVENT_PREFIX)
+    end
+
+    self.eventsRegistered = false
+    self:CancelJoinTimer()
+    self:CancelCompletionTimer()
+end
+
+function AutoGreeting:ApplySettings()
+    local db = GetDB()
+
+    self:UnregisterEvents()
+    self.wasInGreetingGroup = self:IsInGreetingGroup()
+
+    if db.enabled then
+        self:RegisterEvents()
+    end
+end
+
+function AutoGreeting:Initialize()
+    self:ApplySettings()
+end
+
+function AutoGreeting:Refresh()
+    self:ApplySettings()
+end

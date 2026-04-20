@@ -17,6 +17,10 @@ function Module:Enable()
     if ns.CombatMessage and ns.CombatMessage.Initialize then
         ns.CombatMessage:Initialize()
     end
+
+    if ns.AutoGreeting and ns.AutoGreeting.Initialize then
+        ns.AutoGreeting:Initialize()
+    end
 end
 
 function Module:Refresh()
@@ -26,5 +30,9 @@ function Module:Refresh()
 
     if ns.CombatMessage and ns.CombatMessage.Refresh then
         ns.CombatMessage:Refresh()
+    end
+
+    if ns.AutoGreeting and ns.AutoGreeting.Refresh then
+        ns.AutoGreeting:Refresh()
     end
 end

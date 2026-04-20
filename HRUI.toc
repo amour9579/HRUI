@@ -57,6 +57,7 @@ Modules\Castbars\Castbars.lua
 
 Modules\Chat\CombatMessage.lua
 Modules\Chat\Chat.lua
+Modules\Chat\AutoGreeting.lua
 Modules\Chat\InfoBar\Data.lua
 Modules\Chat\InfoBar\Popup.lua
 Modules\Chat\InfoBar\Slots.lua

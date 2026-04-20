@@ -69,6 +69,44 @@ local function GetCombatMessageDB()
     return ns.db.profile.chat.combatMessage
 end
 
+local function GetAutoGreetingDB()
+    ns.db.profile.chat = ns.db.profile.chat or {}
+
+    if not ns.db.profile.chat.autoGreeting then
+        ns.db.profile.chat.autoGreeting = {
+            enabled = true,
+            joinEnabled = true,
+            joinMessage = "안녕하세요!",
+            challengeCompletedEnabled = true,
+            challengeCompletedMessage = "수고하셨습니다!",
+        }
+    end
+
+    local db = ns.db.profile.chat.autoGreeting
+
+    if db.enabled == nil then
+        db.enabled = true
+    end
+
+    if db.joinEnabled == nil then
+        db.joinEnabled = true
+    end
+
+    if db.challengeCompletedEnabled == nil then
+        db.challengeCompletedEnabled = true
+    end
+
+    if db.joinMessage == nil or db.joinMessage == "" then
+        db.joinMessage = "안녕하세요!"
+    end
+
+    if db.challengeCompletedMessage == nil or db.challengeCompletedMessage == "" then
+        db.challengeCompletedMessage = "수고하셨습니다!"
+    end
+
+    return db
+end
+
 local infoBarValues = {
     NONE = "없음",
     TIME = "시간",
@@ -629,6 +667,100 @@ function ns:CreateChatOptions()
                             db.endColor or { 0.2, 1.0, 0.2 }
                         )
                     end
+                end,
+            },
+
+            headerAutoGreeting = {
+                type = "header",
+                name = "자동 인사",
+                order = 27,
+            },
+
+            autoGreetingEnabled = {
+                type = "toggle",
+                name = "자동 인사 사용",
+                width = "full",
+                order = 27.1,
+                get = function()
+                    return GetAutoGreetingDB().enabled
+                end,
+                set = function(_, value)
+                    GetAutoGreetingDB().enabled = value
+                    if ns.AutoGreeting and ns.AutoGreeting.Refresh then
+                        ns.AutoGreeting:Refresh()
+                    end
+                end,
+            },
+
+            autoGreetingJoinEnabled = {
+                type = "toggle",
+                name = "파티 참가 시 인사",
+                width = "half",
+                order = 27.2,
+                disabled = function()
+                    return not GetAutoGreetingDB().enabled
+                end,
+                get = function()
+                    return GetAutoGreetingDB().joinEnabled
+                end,
+                set = function(_, value)
+                    GetAutoGreetingDB().joinEnabled = value
+                    if ns.AutoGreeting and ns.AutoGreeting.Refresh then
+                        ns.AutoGreeting:Refresh()
+                    end
+                end,
+            },
+
+            autoGreetingChallengeCompletedEnabled = {
+                type = "toggle",
+                name = "쐐기 완료 시 인사",
+                width = "half",
+                order = 27.3,
+                disabled = function()
+                    return not GetAutoGreetingDB().enabled
+                end,
+                get = function()
+                    return GetAutoGreetingDB().challengeCompletedEnabled
+                end,
+                set = function(_, value)
+                    GetAutoGreetingDB().challengeCompletedEnabled = value
+                    if ns.AutoGreeting and ns.AutoGreeting.Refresh then
+                        ns.AutoGreeting:Refresh()
+                    end
+                end,
+            },
+
+            autoGreetingJoinMessage = {
+                type = "input",
+                name = "파티 참가 문구",
+                width = "full",
+                order = 27.4,
+                disabled = function()
+                    local db = GetAutoGreetingDB()
+                    return not db.enabled or not db.joinEnabled
+                end,
+                get = function()
+                    return GetAutoGreetingDB().joinMessage or ""
+                end,
+                set = function(_, value)
+                    GetAutoGreetingDB().joinMessage = value ~= "" and value or "안녕하세요!"
+                end,
+            },
+
+            autoGreetingChallengeCompletedMessage = {
+                type = "input",
+                name = "쐐기 완료 문구",
+                width = "full",
+                order = 27.5,
+                disabled = function()
+                    local db = GetAutoGreetingDB()
+                    return not db.enabled or not db.challengeCompletedEnabled
+                end,
+                get = function()
+                    return GetAutoGreetingDB().challengeCompletedMessage or ""
+                end,
+                set = function(_, value)
+                    GetAutoGreetingDB().challengeCompletedMessage = value ~= "" and value or "수고하셨습니다!"
                 end,
             },
 
