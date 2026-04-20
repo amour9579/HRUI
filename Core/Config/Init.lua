@@ -12,6 +12,7 @@ function ns:BuildOptions()
             actionbars = ns:CreateActionBarsOptions(),
             chat = ns:CreateChatOptions(),
             keystone = ns:CreateKeystoneReporter(),
+            autogreeting = ns:CreateAutoGreetingOptions(),
             dice = ns:CreateDiceOptions(),
             profiles = ns:CreateProfileOptions(),
         },
