@@ -20,6 +20,7 @@ Core\Config\Castbars.lua
 Core\Config\ActionBars.lua
 Core\Config\KeystoneReporter.lua
 Core\Config\Dice.lua
+Core\Config\AutoGreeting.lua
 Core\Config\Profiles.lua
 Core\Config\Window.lua
 Core\Config\Init.lua
