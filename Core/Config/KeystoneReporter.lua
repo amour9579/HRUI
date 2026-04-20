@@ -14,7 +14,7 @@ function ns:CreateKeystoneReporter()
     return {
         type = "group",
         name = "쐐기",
-        order = 50,
+        order = 6,
         args = {
             mythicPlusReporter = {
                 type = "toggle",
