@@ -165,7 +165,7 @@ ns.Defaults = {
             enabled = true,
             delay = 5,
             autoRoll = 1,
-            hideInDungeons = false,
+            hideInDungeons = true,
         },
 
 
