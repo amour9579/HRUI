@@ -1,0 +1,65 @@
+## Interface: 120001
+## Title: HRUI
+## Notes: HRUI
+## Author: HR
+## Version: 0.1.0
+## SavedVariables: HRUIDB
+## SavedVariablesPerCharacter: HRUICharDB
+## Dependencies: oUF
+
+Embeds.xml
+
+Core\Config\Chat.lua
+Init.lua
+
+Core\Config\Defaults.lua
+Core\Config\Helpers.lua
+Core\Config\Common.lua
+Core\Config\UnitFrames.lua
+Core\Config\Castbars.lua
+Core\Config\ActionBars.lua
+Core\Config\KeystoneReporter.lua
+Core\Config\Dice.lua
+Core\Config\Profiles.lua
+Core\Config\Window.lua
+Core\Config\Init.lua
+Core\Config\BlizzardPanel.lua
+
+Core\Commands.lua
+Core\Media.lua
+Core\Core.lua
+Core\Event.lua
+Core\Movers.lua
+
+Modules\MythicPlus\KeystoneReporter.lua
+Modules\Elements\TextFormat.lua
+Modules\Elements\Health.lua
+Modules\Elements\Power.lua
+Modules\Elements\Name.lua
+Modules\Elements\Castbar.lua
+Modules\ActionBars\ActionBars.lua
+Modules\Elements\PlayerIcons.lua
+Indicators\BuffIndicators.lua
+
+Modules\UnitFrames\Shared.lua
+Modules\UnitFrames\Style.lua
+Modules\UnitFrames\Player.lua
+Modules\UnitFrames\Target.lua
+Modules\UnitFrames\TargetTarget.lua
+Modules\UnitFrames\Focus.lua
+Modules\UnitFrames\Pet.lua
+Modules\UnitFrames\UnitFrames.lua
+
+Modules\Castbars\Player.lua
+Modules\Castbars\Target.lua
+Modules\Castbars\Pet.lua
+Modules\Castbars\Castbars.lua
+
+Modules\Chat\CombatMessage.lua
+Modules\Chat\Chat.lua
+Modules\Chat\InfoBar\Data.lua
+Modules\Chat\InfoBar\Popup.lua
+Modules\Chat\InfoBar\Slots.lua
+Modules\Chat\InfoBar\Layout.lua
+Modules\Chat\InfoBar\Core.lua
+Modules\Dice\DiceRoll.lua
