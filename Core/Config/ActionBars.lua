@@ -64,7 +64,7 @@ function ns:CreateActionBarsOptions()
   return {
     type = "group",
     name = "단축바, 기본바",
-    order = 30,
+    order = 4,
     args = {
       skin = {
         type = "toggle",
