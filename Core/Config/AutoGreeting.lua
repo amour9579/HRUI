@@ -129,28 +129,10 @@ function ns:CreateAutoGreetingOptions()
                 end,
             },
 
-            summonEnabled = {
-                type = "toggle",
-                name = "소환 받을 시 인사",
-                order = 5,
-                disabled = function()
-                    return not GetAutoGreetingDB().enabled
-                end,
-                get = function()
-                    return GetAutoGreetingDB().summonEnabled
-                end,
-                set = function(_, value)
-                    GetAutoGreetingDB().summonEnabled = value
-                    if ns.AutoGreeting and ns.AutoGreeting.Refresh then
-                        ns.AutoGreeting:Refresh()
-                    end
-                end,
-            },
-
             leaderJoinEnabled = {
                 type = "toggle",
-                name = "파티원 추가 시 인사",
-                order = 6,
+                name = "파티원 추가 시 인사(파티장일 경우)",
+                order = 5,
                 disabled = function()
                     return not GetAutoGreetingDB().enabled
                 end,
@@ -159,6 +141,24 @@ function ns:CreateAutoGreetingOptions()
                 end,
                 set = function(_, value)
                     GetAutoGreetingDB().leaderJoinEnabled = value
+                    if ns.AutoGreeting and ns.AutoGreeting.Refresh then
+                        ns.AutoGreeting:Refresh()
+                    end
+                end,
+            },
+
+            summonEnabled = {
+                type = "toggle",
+                name = "소환 받을 시 인사",
+                order = 6,
+                disabled = function()
+                    return not GetAutoGreetingDB().enabled
+                end,
+                get = function()
+                    return GetAutoGreetingDB().summonEnabled
+                end,
+                set = function(_, value)
+                    GetAutoGreetingDB().summonEnabled = value
                     if ns.AutoGreeting and ns.AutoGreeting.Refresh then
                         ns.AutoGreeting:Refresh()
                     end
