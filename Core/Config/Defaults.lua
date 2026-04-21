@@ -127,7 +127,7 @@ ns.Defaults = {
                 challengeCompletedEnabled = true,
                 challengeCompletedMessage = "수고 하셨습니다",
                 summonEnabled = true,
-                summonMessage = "감사 합니다",
+                summonMessage = "소환 감사 합니다",
             },
 
             infoBar = {
