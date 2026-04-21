@@ -7,10 +7,12 @@ AutoGreeting.eventsRegistered = false
 AutoGreeting.wasInGreetingGroup = false
 AutoGreeting.pendingJoinTimer = nil
 AutoGreeting.pendingCompletionTimer = nil
+AutoGreeting.pendingSummonTimer = nil
 
 local EVENT_PREFIX = "AutoGreeting_"
 local DEFAULT_JOIN_MESSAGE = "안녕 하세요"
 local DEFAULT_CHALLENGE_COMPLETED_MESSAGE = "수고 하셨습니다"
+local DEFAULT_SUMMON_MESSAGE = "감사 합니다"
 
 local function GetDB()
     ns.db.profile.chat = ns.db.profile.chat or {}
@@ -20,6 +22,8 @@ local function GetDB()
         joinMessage = DEFAULT_JOIN_MESSAGE,
         challengeCompletedEnabled = true,
         challengeCompletedMessage = DEFAULT_CHALLENGE_COMPLETED_MESSAGE,
+        summonEnabled = true,
+        summonMessage = DEFAULT_SUMMON_MESSAGE,
     }
 
     local db = ns.db.profile.chat.autoGreeting
@@ -36,12 +40,20 @@ local function GetDB()
         db.challengeCompletedEnabled = true
     end
 
+    if db.summonEnabled == nil then
+        db.summonEnabled = true
+    end
+
     if db.joinMessage == nil or db.joinMessage == "" then
         db.joinMessage = DEFAULT_JOIN_MESSAGE
     end
 
     if db.challengeCompletedMessage == nil or db.challengeCompletedMessage == "" then
         db.challengeCompletedMessage = DEFAULT_CHALLENGE_COMPLETED_MESSAGE
+    end
+
+    if db.summonMessage == nil or db.summonMessage == "" then
+        db.summonMessage = DEFAULT_SUMMON_MESSAGE
     end
 
     return db
@@ -67,6 +79,22 @@ function AutoGreeting:GetGroupChannel()
     return nil
 end
 
+function AutoGreeting:GetSummonChannel()
+    if IsInGroup(LE_PARTY_CATEGORY_INSTANCE) then
+        return "INSTANCE_CHAT"
+    end
+
+    if IsInRaid() then
+        return "RAID"
+    end
+
+    if IsInGroup() then
+        return "PARTY"
+    end
+
+    return nil
+end
+
 function AutoGreeting:IsInGreetingGroup()
     return self:GetGroupChannel() ~= nil
 end
@@ -82,6 +110,13 @@ function AutoGreeting:CancelCompletionTimer()
     if self.pendingCompletionTimer then
         self.pendingCompletionTimer:Cancel()
         self.pendingCompletionTimer = nil
+    end
+end
+
+function AutoGreeting:CancelSummonTimer()
+    if self.pendingSummonTimer then
+        self.pendingSummonTimer:Cancel()
+        self.pendingSummonTimer = nil
     end
 end
 
@@ -134,6 +169,26 @@ function AutoGreeting:ScheduleChallengeCompletedGreeting()
     end)
 end
 
+function AutoGreeting:ScheduleSummonGreeting()
+    local db = GetDB()
+    if not db.enabled or not db.summonEnabled then
+        return
+    end
+
+    self:CancelSummonTimer()
+
+    self.pendingSummonTimer = C_Timer.NewTimer(2, function()
+        self.pendingSummonTimer = nil
+
+        local channel = self:GetSummonChannel()
+        if not channel then
+            return
+        end
+
+        self:SendMessage(channel, GetDB().summonMessage)
+    end)
+end
+
 function AutoGreeting:OnGroupRosterUpdate()
     local isInGreetingGroup = self:IsInGreetingGroup()
 
@@ -150,6 +205,10 @@ function AutoGreeting:OnChallengeModeCompleted()
     self:ScheduleChallengeCompletedGreeting()
 end
 
+function AutoGreeting:OnConfirmSummon()
+    self:ScheduleSummonGreeting()
+end
+
 function AutoGreeting:RegisterEvents()
     if self.eventsRegistered or not ns.Event then
         return
@@ -163,6 +222,10 @@ function AutoGreeting:RegisterEvents()
         AutoGreeting:OnChallengeModeCompleted()
     end)
 
+    ns.Event:Register("CONFIRM_SUMMON", EVENT_PREFIX .. "ConfirmSummon", function()
+        AutoGreeting:OnConfirmSummon()
+    end)
+
     self.eventsRegistered = true
 end
 
@@ -174,6 +237,7 @@ function AutoGreeting:UnregisterEvents()
     self.eventsRegistered = false
     self:CancelJoinTimer()
     self:CancelCompletionTimer()
+    self:CancelSummonTimer()
 end
 
 function AutoGreeting:ApplySettings()
