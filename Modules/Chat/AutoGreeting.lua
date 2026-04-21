@@ -137,7 +137,7 @@ function AutoGreeting:ScheduleJoinGreeting()
 
     self:CancelJoinTimer()
 
-    self.pendingJoinTimer = C_Timer.NewTimer(2, function()
+    self.pendingJoinTimer = C_Timer.NewTimer(1, function()
         self.pendingJoinTimer = nil
 
         local channel = self:GetGroupChannel()
@@ -177,7 +177,7 @@ function AutoGreeting:ScheduleSummonGreeting()
 
     self:CancelSummonTimer()
 
-    self.pendingSummonTimer = C_Timer.NewTimer(2, function()
+    self.pendingSummonTimer = C_Timer.NewTimer(1, function()
         self.pendingSummonTimer = nil
 
         local channel = self:GetSummonChannel()
