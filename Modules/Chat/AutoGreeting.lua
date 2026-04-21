@@ -9,8 +9,8 @@ AutoGreeting.pendingJoinTimer = nil
 AutoGreeting.pendingCompletionTimer = nil
 
 local EVENT_PREFIX = "AutoGreeting_"
-local DEFAULT_JOIN_MESSAGE = "안녕하세요!"
-local DEFAULT_CHALLENGE_COMPLETED_MESSAGE = "수고하셨습니다!"
+local DEFAULT_JOIN_MESSAGE = "안녕 하세요"
+local DEFAULT_CHALLENGE_COMPLETED_MESSAGE = "수고 하셨습니다"
 
 local function GetDB()
     ns.db.profile.chat = ns.db.profile.chat or {}
