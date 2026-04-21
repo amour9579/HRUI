@@ -2,7 +2,7 @@ local _, ns = ...
 
 local DEFAULT_JOIN_MESSAGE = "안녕 하세요"
 local DEFAULT_CHALLENGE_COMPLETED_MESSAGE = "수고 하셨습니다"
-local DEFAULT_SUMMON_MESSAGE = "감사 합니다"
+local DEFAULT_SUMMON_MESSAGE = "소환 감사 합니다"
 
 local function GetAutoGreetingDB()
     ns.db.profile.chat = ns.db.profile.chat or {}
