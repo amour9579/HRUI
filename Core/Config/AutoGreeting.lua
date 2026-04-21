@@ -2,7 +2,9 @@ local _, ns = ...
 
 local DEFAULT_JOIN_MESSAGE = "안녕 하세요"
 local DEFAULT_CHALLENGE_COMPLETED_MESSAGE = "수고 하셨습니다"
-local DEFAULT_SUMMON_MESSAGE = "소환 감사 합니다"
+local DEFAULT_SUMMON_MESSAGE = "감사 합니다"
+
+local DEFAULT_LEADER_JOIN_MESSAGE = "어서 오세요"
 
 local function GetAutoGreetingDB()
     ns.db.profile.chat = ns.db.profile.chat or {}
@@ -16,6 +18,8 @@ local function GetAutoGreetingDB()
             challengeCompletedMessage = DEFAULT_CHALLENGE_COMPLETED_MESSAGE,
             summonEnabled = true,
             summonMessage = DEFAULT_SUMMON_MESSAGE,
+            leaderJoinEnabled = true,
+            leaderJoinMessage = DEFAULT_LEADER_JOIN_MESSAGE,
         }
     end
 
@@ -37,6 +41,10 @@ local function GetAutoGreetingDB()
         db.summonEnabled = true
     end
 
+    if db.leaderJoinEnabled == nil then
+        db.leaderJoinEnabled = true
+    end
+
     if db.joinMessage == nil or db.joinMessage == "" then
         db.joinMessage = DEFAULT_JOIN_MESSAGE
     end
@@ -47,6 +55,10 @@ local function GetAutoGreetingDB()
 
     if db.summonMessage == nil or db.summonMessage == "" then
         db.summonMessage = DEFAULT_SUMMON_MESSAGE
+    end
+
+    if db.leaderJoinMessage == nil or db.leaderJoinMessage == "" then
+        db.leaderJoinMessage = DEFAULT_LEADER_JOIN_MESSAGE
     end
 
     return db
@@ -135,18 +147,36 @@ function ns:CreateAutoGreetingOptions()
                 end,
             },
 
+            leaderJoinEnabled = {
+                type = "toggle",
+                name = "파티원 추가 시 인사",
+                order = 6,
+                disabled = function()
+                    return not GetAutoGreetingDB().enabled
+                end,
+                get = function()
+                    return GetAutoGreetingDB().leaderJoinEnabled
+                end,
+                set = function(_, value)
+                    GetAutoGreetingDB().leaderJoinEnabled = value
+                    if ns.AutoGreeting and ns.AutoGreeting.Refresh then
+                        ns.AutoGreeting:Refresh()
+                    end
+                end,
+            },
+
             break1 = {
                 type = "description",
                 name = "",
                 width = "full",
-                order = 5.1,
+                order = 6.1,
             },
 
             joinMessage = {
                 type = "input",
                 name = "파티 참가 문구",
                 width = "full",
-                order = 6,
+                order = 7,
                 disabled = function()
                     local db = GetAutoGreetingDB()
                     return not db.enabled or not db.joinEnabled
@@ -163,7 +193,7 @@ function ns:CreateAutoGreetingOptions()
                 type = "input",
                 name = "쐐기 완료 문구",
                 width = "full",
-                order = 7,
+                order = 8,
                 disabled = function()
                     local db = GetAutoGreetingDB()
                     return not db.enabled or not db.challengeCompletedEnabled
@@ -180,7 +210,7 @@ function ns:CreateAutoGreetingOptions()
                 type = "input",
                 name = "소환 감사 문구",
                 width = "full",
-                order = 8,
+                order = 9,
                 disabled = function()
                     local db = GetAutoGreetingDB()
                     return not db.enabled or not db.summonEnabled
@@ -190,6 +220,23 @@ function ns:CreateAutoGreetingOptions()
                 end,
                 set = function(_, value)
                     GetAutoGreetingDB().summonMessage = value ~= "" and value or DEFAULT_SUMMON_MESSAGE
+                end,
+            },
+
+            leaderJoinMessage = {
+                type = "input",
+                name = "파티원 추가 인사 문구",
+                width = "full",
+                order = 10,
+                disabled = function()
+                    local db = GetAutoGreetingDB()
+                    return not db.enabled or not db.leaderJoinEnabled
+                end,
+                get = function()
+                    return GetAutoGreetingDB().leaderJoinMessage or ""
+                end,
+                set = function(_, value)
+                    GetAutoGreetingDB().leaderJoinMessage = value ~= "" and value or DEFAULT_LEADER_JOIN_MESSAGE
                 end,
             },
         },
