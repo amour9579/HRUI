@@ -632,6 +632,12 @@ function ns:CreateChatOptions()
                 end,
             },
 
+            break5 = {
+                type = "description",
+                name = "",
+                width = "full",
+                order = 26.5,
+            },
             move = {
                 type = "execute",
                 order = 31,
