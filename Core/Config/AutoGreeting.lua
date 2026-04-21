@@ -70,7 +70,6 @@ function ns:CreateAutoGreetingOptions()
             joinEnabled = {
                 type = "toggle",
                 name = "파티 참가 시 인사",
-                --width = "half",
                 order = 3,
                 disabled = function()
                     return not GetAutoGreetingDB().enabled
@@ -89,7 +88,6 @@ function ns:CreateAutoGreetingOptions()
             challengeCompletedEnabled = {
                 type = "toggle",
                 name = "쐐기 완료 시 인사",
-                --width = "half",
                 order = 4,
                 disabled = function()
                     return not GetAutoGreetingDB().enabled
