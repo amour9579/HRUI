@@ -123,9 +123,9 @@ ns.Defaults = {
             autoGreeting = {
                 enabled = true,
                 joinEnabled = true,
-                joinMessage = "안녕하세요!",
+                joinMessage = "안녕 하세요",
                 challengeCompletedEnabled = true,
-                challengeCompletedMessage = "수고하셨습니다!",
+                challengeCompletedMessage = "수고 하셨습니다",
             },
 
             infoBar = {
