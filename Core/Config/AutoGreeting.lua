@@ -7,9 +7,9 @@ local function GetAutoGreetingDB()
         ns.db.profile.chat.autoGreeting = {
             enabled = true,
             joinEnabled = true,
-            joinMessage = "안녕하세요!",
+            joinMessage = "안녕 하세요",
             challengeCompletedEnabled = true,
-            challengeCompletedMessage = "수고하셨습니다!",
+            challengeCompletedMessage = "수고 하셨습니다",
         }
     end
 
@@ -28,11 +28,11 @@ local function GetAutoGreetingDB()
     end
 
     if db.joinMessage == nil or db.joinMessage == "" then
-        db.joinMessage = "안녕하세요!"
+        db.joinMessage = "안녕 하세요"
     end
 
     if db.challengeCompletedMessage == nil or db.challengeCompletedMessage == "" then
-        db.challengeCompletedMessage = "수고하셨습니다!"
+        db.challengeCompletedMessage = "수고 하셨습니다"
     end
 
     return db
@@ -125,7 +125,7 @@ function ns:CreateAutoGreetingOptions()
                     return GetAutoGreetingDB().joinMessage or ""
                 end,
                 set = function(_, value)
-                    GetAutoGreetingDB().joinMessage = value ~= "" and value or "안녕하세요!"
+                    GetAutoGreetingDB().joinMessage = value ~= "" and value or "안녕 하세요"
                 end,
             },
 
@@ -142,7 +142,7 @@ function ns:CreateAutoGreetingOptions()
                     return GetAutoGreetingDB().challengeCompletedMessage or ""
                 end,
                 set = function(_, value)
-                    GetAutoGreetingDB().challengeCompletedMessage = value ~= "" and value or "수고하셨습니다!"
+                    GetAutoGreetingDB().challengeCompletedMessage = value ~= "" and value or "수고 하셨습니다"
                 end,
             },
         },
