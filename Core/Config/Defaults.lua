@@ -126,6 +126,8 @@ ns.Defaults = {
                 joinMessage = "안녕 하세요",
                 challengeCompletedEnabled = true,
                 challengeCompletedMessage = "수고 하셨습니다",
+                summonEnabled = true,
+                summonMessage = "감사 합니다",
             },
 
             infoBar = {
