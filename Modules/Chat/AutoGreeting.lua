@@ -8,11 +8,15 @@ AutoGreeting.wasInGreetingGroup = false
 AutoGreeting.pendingJoinTimer = nil
 AutoGreeting.pendingCompletionTimer = nil
 AutoGreeting.pendingSummonTimer = nil
+AutoGreeting.pendingLeaderJoinTimer = nil
+AutoGreeting.partyMemberCount = 0
 
 local EVENT_PREFIX = "AutoGreeting_"
 local DEFAULT_JOIN_MESSAGE = "안녕 하세요"
 local DEFAULT_CHALLENGE_COMPLETED_MESSAGE = "수고 하셨습니다"
-local DEFAULT_SUMMON_MESSAGE = "소환 감사 합니다"
+local DEFAULT_SUMMON_MESSAGE = "감사 합니다"
+
+local DEFAULT_LEADER_JOIN_MESSAGE = "어서 오세요"
 
 local function GetDB()
     ns.db.profile.chat = ns.db.profile.chat or {}
@@ -24,6 +28,8 @@ local function GetDB()
         challengeCompletedMessage = DEFAULT_CHALLENGE_COMPLETED_MESSAGE,
         summonEnabled = true,
         summonMessage = DEFAULT_SUMMON_MESSAGE,
+        leaderJoinEnabled = true,
+        leaderJoinMessage = DEFAULT_LEADER_JOIN_MESSAGE,
     }
 
     local db = ns.db.profile.chat.autoGreeting
@@ -44,6 +50,10 @@ local function GetDB()
         db.summonEnabled = true
     end
 
+    if db.leaderJoinEnabled == nil then
+        db.leaderJoinEnabled = true
+    end
+
     if db.joinMessage == nil or db.joinMessage == "" then
         db.joinMessage = DEFAULT_JOIN_MESSAGE
     end
@@ -54,6 +64,10 @@ local function GetDB()
 
     if db.summonMessage == nil or db.summonMessage == "" then
         db.summonMessage = DEFAULT_SUMMON_MESSAGE
+    end
+
+    if db.leaderJoinMessage == nil or db.leaderJoinMessage == "" then
+        db.leaderJoinMessage = DEFAULT_LEADER_JOIN_MESSAGE
     end
 
     return db
@@ -99,6 +113,18 @@ function AutoGreeting:IsInGreetingGroup()
     return self:GetGroupChannel() ~= nil
 end
 
+function AutoGreeting:IsPartyLeader()
+    return IsInGroup() and not IsInRaid() and UnitIsGroupLeader("player")
+end
+
+function AutoGreeting:GetPartyMemberCount()
+    if IsInGroup() and not IsInRaid() then
+        return GetNumGroupMembers()
+    end
+
+    return 0
+end
+
 function AutoGreeting:CancelJoinTimer()
     if self.pendingJoinTimer then
         self.pendingJoinTimer:Cancel()
@@ -120,6 +146,13 @@ function AutoGreeting:CancelSummonTimer()
     end
 end
 
+function AutoGreeting:CancelLeaderJoinTimer()
+    if self.pendingLeaderJoinTimer then
+        self.pendingLeaderJoinTimer:Cancel()
+        self.pendingLeaderJoinTimer = nil
+    end
+end
+
 function AutoGreeting:SendMessage(channel, message)
     local trimmedMessage = TrimMessage(message)
     if not channel or trimmedMessage == "" then
@@ -137,7 +170,7 @@ function AutoGreeting:ScheduleJoinGreeting()
 
     self:CancelJoinTimer()
 
-    self.pendingJoinTimer = C_Timer.NewTimer(1, function()
+    self.pendingJoinTimer = C_Timer.NewTimer(2, function()
         self.pendingJoinTimer = nil
 
         local channel = self:GetGroupChannel()
@@ -177,7 +210,7 @@ function AutoGreeting:ScheduleSummonGreeting()
 
     self:CancelSummonTimer()
 
-    self.pendingSummonTimer = C_Timer.NewTimer(1, function()
+    self.pendingSummonTimer = C_Timer.NewTimer(2, function()
         self.pendingSummonTimer = nil
 
         local channel = self:GetSummonChannel()
@@ -185,20 +218,46 @@ function AutoGreeting:ScheduleSummonGreeting()
             return
         end
 
-        self:SendMessage(channel, GetDB().summonMessage)
+    self:SendMessage(channel, GetDB().summonMessage)
+    end)
+end
+
+function AutoGreeting:ScheduleLeaderJoinGreeting()
+    local db = GetDB()
+    if not db.enabled or not db.leaderJoinEnabled then
+        return
+    end
+
+    self.pendingLeaderJoinTimer = C_Timer.NewTimer(1, function()
+        self.pendingLeaderJoinTimer = nil
+        local timerDB = GetDB()
+
+        if not timerDB.enabled or not timerDB.leaderJoinEnabled or not self:IsPartyLeader() then
+            return
+        end
+
+        self:SendMessage("PARTY", timerDB.leaderJoinMessage)
     end)
 end
 
 function AutoGreeting:OnGroupRosterUpdate()
     local isInGreetingGroup = self:IsInGreetingGroup()
+    local currentPartyMemberCount = self:GetPartyMemberCount()
+    local addedPartyMemberCount = currentPartyMemberCount - self.partyMemberCount
 
     if isInGreetingGroup and not self.wasInGreetingGroup then
         self:ScheduleJoinGreeting()
+    elseif isInGreetingGroup and self.wasInGreetingGroup and addedPartyMemberCount > 0 and self:IsPartyLeader() then
+        for _ = 1, addedPartyMemberCount do
+            self:ScheduleLeaderJoinGreeting()
+        end
     elseif not isInGreetingGroup then
         self:CancelJoinTimer()
+        self:CancelLeaderJoinTimer()
     end
 
     self.wasInGreetingGroup = isInGreetingGroup
+    self.partyMemberCount = currentPartyMemberCount
 end
 
 function AutoGreeting:OnChallengeModeCompleted()
@@ -238,6 +297,7 @@ function AutoGreeting:UnregisterEvents()
     self:CancelJoinTimer()
     self:CancelCompletionTimer()
     self:CancelSummonTimer()
+    self:CancelLeaderJoinTimer()
 end
 
 function AutoGreeting:ApplySettings()
@@ -245,6 +305,7 @@ function AutoGreeting:ApplySettings()
 
     self:UnregisterEvents()
     self.wasInGreetingGroup = self:IsInGreetingGroup()
+    self.partyMemberCount = self:GetPartyMemberCount()
 
     if db.enabled then
         self:RegisterEvents()
