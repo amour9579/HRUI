@@ -13,7 +13,6 @@ local function DisableBlizzardPlayerCastBar()
     end
 
     blizz.__HRUI_Disabled = true
-
     blizz:UnregisterAllEvents()
     blizz:Hide()
     blizz:SetAlpha(0)
@@ -41,6 +40,28 @@ local function GetProfessionsCastBarAnchor()
     return craftingPage.OverlayCastBarAnchor
 end
 
+local function ApplyProfessionVisualState(frame, usingProfessionAnchor)
+    if not frame then
+        return
+    end
+
+    if usingProfessionAnchor then
+        frame:SetFrameStrata("HIGH")
+        frame:SetFrameLevel(120)
+
+        if frame.Icon then
+            frame.Icon:Hide()
+        end
+    else
+        frame:SetFrameStrata("MEDIUM")
+        frame:SetFrameLevel(10)
+
+        local db = ns.db and ns.db.profile and ns.db.profile.castbars and ns.db.profile.castbars.player
+        if frame.Icon and db and db.icon and db.icon.enabled then
+            frame.Icon:Show()
+        end
+    end
+end
 local function UpdatePlayerCastbarAnchor(frame)
     if not frame then
         return
@@ -51,15 +72,21 @@ local function UpdatePlayerCastbarAnchor(frame)
         return
     end
 
+    local anchor = GetProfessionsCastBarAnchor()
     frame:ClearAllPoints()
 
-    local anchor = GetProfessionsCastBarAnchor()
     if anchor then
+        frame:SetParent(UIParent)
         frame:SetPoint("CENTER", anchor, "CENTER", 0, 0)
+        frame:SetSize(240, 20)
         frame.__HRUI_UsingProfessionAnchor = true
+        ApplyProfessionVisualState(frame, true)
     else
+        frame:SetParent(UIParent)
         frame:SetPoint("CENTER", UIParent, "CENTER", db.x or 0, db.y or 0)
+        frame:SetSize(db.width, db.height)
         frame.__HRUI_UsingProfessionAnchor = false
+        ApplyProfessionVisualState(frame, false)
     end
 end
 
@@ -81,7 +108,6 @@ local function HookProfessionsCastbarAnchor()
 
     ProfessionsFrame:HookScript("OnShow", function()
         DisableBlizzardPlayerCastBar()
-
         if ns.PlayerCastbar then
             UpdatePlayerCastbarAnchor(ns.PlayerCastbar)
         end
@@ -96,7 +122,6 @@ local function HookProfessionsCastbarAnchor()
     if ProfessionsFrame.CraftingPage and ProfessionsFrame.CraftingPage.HookScript then
         ProfessionsFrame.CraftingPage:HookScript("OnShow", function()
             DisableBlizzardPlayerCastBar()
-
             if ns.PlayerCastbar then
                 UpdatePlayerCastbarAnchor(ns.PlayerCastbar)
             end
@@ -109,6 +134,7 @@ local function HookProfessionsCastbarAnchor()
         end)
     end
 end
+
 local function UpdatePlayerCastState(frame)
     if not frame or not ns.db.profile.castbars.player.enabled then
         if frame then
@@ -119,12 +145,14 @@ local function UpdatePlayerCastState(frame)
 
     local name, _, texture, startTimeMS, endTimeMS, _, _, notInterruptible = UnitCastingInfo("player")
     if name and startTimeMS and endTimeMS then
+        UpdatePlayerCastbarAnchor(frame)
         ns:StartCastbarCast(frame, name, texture, startTimeMS, endTimeMS, notInterruptible)
         return
     end
 
     local chName, _, chTexture, chStartTimeMS, chEndTimeMS, _, chNotInterruptible = UnitChannelInfo("player")
     if chName and chStartTimeMS and chEndTimeMS then
+        UpdatePlayerCastbarAnchor(frame)
         ns:StartCastbarChannel(frame, chName, chTexture, chStartTimeMS, chEndTimeMS, chNotInterruptible)
         return
     end
@@ -149,8 +177,8 @@ function ns:SpawnPlayerCastbar()
     frame:SetMinMaxValues(0, 1)
     frame:SetValue(0)
 
-    UpdatePlayerCastbarAnchor(frame)
     ns:CreateCastbar(frame, db)
+    UpdatePlayerCastbarAnchor(frame)
     frame:Hide()
 
     frame:SetScript("OnUpdate", function(self)
@@ -200,16 +228,11 @@ function ns:SpawnPlayerCastbar()
             return
         end
 
-        if event == "UNIT_SPELLCAST_FAILED" then
-            UpdatePlayerCastState(self)
-            return
-        end
-
-        UpdatePlayerCastbarAnchor(self)
         UpdatePlayerCastState(self)
     end)
 
     DisableBlizzardPlayerCastBar()
+
     ns.PlayerCastbar = frame
     return frame
 end
