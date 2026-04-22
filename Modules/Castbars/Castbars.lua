@@ -70,7 +70,11 @@ local function ApplyCastbarSettings(key)
     end
 
     ApplyFrameAnchor(key, frame, db)
-    frame:SetSize(db.width, db.height)
+    if key == "player" and frame.__HRUI_UsingProfessionAnchor then
+        frame:SetSize(240, 20)
+    else
+        frame:SetSize(db.width, db.height)
+    end
     frame:SetStatusBarTexture(ns:GetTexture())
 
     ns:CreateCastbar(frame, db)
