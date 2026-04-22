@@ -47,14 +47,18 @@ function Event:Unregister(event, key)
     CleanupEventBucket(self, event)
 end
 
+local function EscapeLuaPattern(text)
+    return tostring(text):gsub("([^%w])", "%%%1")
+end
 function Event:UnregisterPrefix(prefix)
     if not prefix or prefix == "" then
         return
     end
 
+    local safePrefix = "^" .. EscapeLuaPattern(prefix)
     for event, bucket in pairs(self.handlers) do
         for key in pairs(bucket) do
-            if type(key) == "string" and key:find("^" .. prefix) then
+            if type(key) == "string" and key:find(safePrefix) then
                 bucket[key] = nil
             end
         end
@@ -69,10 +73,15 @@ function Event:Dispatch(event, ...)
         return
     end
 
+    local callbacks = {}
     for _, func in pairs(bucket) do
         if type(func) == "function" then
-            func(event, ...)
+            callbacks[#callbacks + 1] = func
         end
+    end
+
+    for i = 1, #callbacks do
+        callbacks[i](event, ...)
     end
 end
 
