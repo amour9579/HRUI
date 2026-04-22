@@ -1,5 +1,114 @@
 local _, ns = ...
 
+local function DisableBlizzardPlayerCastBar()
+    local blizz = _G.OverlayPlayerCastingBarFrame
+    if not blizz then
+        return
+    end
+
+    if blizz.__HRUI_Disabled then
+        blizz:Hide()
+        blizz:SetAlpha(0)
+        return
+    end
+
+    blizz.__HRUI_Disabled = true
+
+    blizz:UnregisterAllEvents()
+    blizz:Hide()
+    blizz:SetAlpha(0)
+    blizz.Show = function() end
+
+    if blizz.HookScript then
+        blizz:HookScript("OnShow", function(self)
+            self:Hide()
+            self:SetAlpha(0)
+        end)
+    end
+end
+
+local function GetProfessionsCastBarAnchor()
+    local ProfessionsFrame = _G.ProfessionsFrame
+    if not ProfessionsFrame or not ProfessionsFrame:IsShown() then
+        return nil
+    end
+
+    local craftingPage = ProfessionsFrame.CraftingPage
+    if not craftingPage then
+        return nil
+    end
+
+    return craftingPage.OverlayCastBarAnchor
+end
+
+local function UpdatePlayerCastbarAnchor(frame)
+    if not frame then
+        return
+    end
+
+    local db = ns.db and ns.db.profile and ns.db.profile.castbars and ns.db.profile.castbars.player
+    if not db then
+        return
+    end
+
+    frame:ClearAllPoints()
+
+    local anchor = GetProfessionsCastBarAnchor()
+    if anchor then
+        frame:SetPoint("CENTER", anchor, "CENTER", 0, 0)
+        frame.__HRUI_UsingProfessionAnchor = true
+    else
+        frame:SetPoint("CENTER", UIParent, "CENTER", db.x or 0, db.y or 0)
+        frame.__HRUI_UsingProfessionAnchor = false
+    end
+end
+
+function ns:UpdatePlayerCastbarAnchor(frame)
+    UpdatePlayerCastbarAnchor(frame)
+end
+
+local function HookProfessionsCastbarAnchor()
+    if ns.__HRUI_ProfessionsHooked then
+        return
+    end
+
+    local ProfessionsFrame = _G.ProfessionsFrame
+    if not ProfessionsFrame then
+        return
+    end
+
+    ns.__HRUI_ProfessionsHooked = true
+
+    ProfessionsFrame:HookScript("OnShow", function()
+        DisableBlizzardPlayerCastBar()
+
+        if ns.PlayerCastbar then
+            UpdatePlayerCastbarAnchor(ns.PlayerCastbar)
+        end
+    end)
+
+    ProfessionsFrame:HookScript("OnHide", function()
+        if ns.PlayerCastbar then
+            UpdatePlayerCastbarAnchor(ns.PlayerCastbar)
+        end
+    end)
+
+    if ProfessionsFrame.CraftingPage and ProfessionsFrame.CraftingPage.HookScript then
+        ProfessionsFrame.CraftingPage:HookScript("OnShow", function()
+            DisableBlizzardPlayerCastBar()
+
+            if ns.PlayerCastbar then
+                UpdatePlayerCastbarAnchor(ns.PlayerCastbar)
+            end
+        end)
+
+        ProfessionsFrame.CraftingPage:HookScript("OnHide", function()
+            if ns.PlayerCastbar then
+                UpdatePlayerCastbarAnchor(ns.PlayerCastbar)
+            end
+        end)
+    end
+end
 local function UpdatePlayerCastState(frame)
     if not frame or not ns.db.profile.castbars.player.enabled then
         if frame then
@@ -25,6 +134,8 @@ end
 
 function ns:SpawnPlayerCastbar()
     if ns.PlayerCastbar then
+        DisableBlizzardPlayerCastBar()
+        UpdatePlayerCastbarAnchor(ns.PlayerCastbar)
         return ns.PlayerCastbar
     end
 
@@ -35,10 +146,10 @@ function ns:SpawnPlayerCastbar()
     frame:SetFrameStrata("MEDIUM")
     frame:SetFrameLevel(10)
     frame:SetSize(db.width, db.height)
-    frame:SetPoint("CENTER", UIParent, "CENTER", db.x, db.y)
     frame:SetMinMaxValues(0, 1)
     frame:SetValue(0)
 
+    UpdatePlayerCastbarAnchor(frame)
     ns:CreateCastbar(frame, db)
     frame:Hide()
 
@@ -57,9 +168,28 @@ function ns:SpawnPlayerCastbar()
     frame:RegisterUnitEvent("UNIT_SPELLCAST_INTERRUPTIBLE", "player")
     frame:RegisterUnitEvent("UNIT_SPELLCAST_NOT_INTERRUPTIBLE", "player")
     frame:RegisterEvent("PLAYER_ENTERING_WORLD")
+    frame:RegisterEvent("ADDON_LOADED")
 
-    frame:SetScript("OnEvent", function(self, event, unit)
-        if event ~= "PLAYER_ENTERING_WORLD" and unit ~= "player" then
+    frame:SetScript("OnEvent", function(self, event, arg1)
+        if event == "ADDON_LOADED" then
+            if arg1 == "Blizzard_Professions" then
+                DisableBlizzardPlayerCastBar()
+                HookProfessionsCastbarAnchor()
+                UpdatePlayerCastbarAnchor(self)
+                UpdatePlayerCastState(self)
+            end
+            return
+        end
+
+        if event == "PLAYER_ENTERING_WORLD" then
+            DisableBlizzardPlayerCastBar()
+            HookProfessionsCastbarAnchor()
+            UpdatePlayerCastbarAnchor(self)
+            UpdatePlayerCastState(self)
+            return
+        end
+
+        if arg1 ~= "player" then
             return
         end
 
@@ -75,9 +205,11 @@ function ns:SpawnPlayerCastbar()
             return
         end
 
+        UpdatePlayerCastbarAnchor(self)
         UpdatePlayerCastState(self)
     end)
 
+    DisableBlizzardPlayerCastBar()
     ns.PlayerCastbar = frame
     return frame
 end
