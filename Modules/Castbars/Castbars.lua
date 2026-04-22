@@ -52,6 +52,15 @@ local function GetFrame(key)
     return ref and ns[ref]
 end
 
+local function ApplyFrameAnchor(key, frame, db)
+    if key == "player" and ns.UpdatePlayerCastbarAnchor then
+        ns:UpdatePlayerCastbarAnchor(frame)
+        return
+    end
+
+    frame:ClearAllPoints()
+    frame:SetPoint("CENTER", UIParent, "CENTER", db.x or 0, db.y or 0)
+end
 local function ApplyCastbarSettings(key)
     local db = ns.db.profile.castbars[key]
     local frame = GetFrame(key)
@@ -60,8 +69,7 @@ local function ApplyCastbarSettings(key)
         return
     end
 
-    frame:ClearAllPoints()
-    frame:SetPoint("CENTER", UIParent, "CENTER", db.x, db.y)
+    ApplyFrameAnchor(key, frame, db)
     frame:SetSize(db.width, db.height)
     frame:SetStatusBarTexture(ns:GetTexture())
 
