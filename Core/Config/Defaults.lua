@@ -178,8 +178,8 @@ ns.Defaults = {
             delay = 5,
             autoRoll = 1,
             hideInDungeons = true,
+            rollTimeout = 60,
         },
-
 
         unitframes = {
             enabled = true,
