@@ -31,7 +31,7 @@ function ns:CreateDiceOptions()
             delay = {
                 type = "range",
                 name = "전리품 주사위 창 닫기 지연",
-                desc = "모든 굴림이 끝난 뒤 전리품 주사위 창을 자동으로 닫기 까지의 시간입니다.",
+                desc = "모든 굴림이 끝난 뒤 전리품 주사위 창을 자동으로 닫기까지의 시간입니다.",
                 order = 3,
                 min = 1,
                 max = 10,
@@ -47,11 +47,29 @@ function ns:CreateDiceOptions()
                 end,
             },
 
+            rollTimeout = {
+                type = "range",
+                name = "전리품 주사위 창 안전 타임아웃",
+                desc = "LOOT_ROLLS_COMPLETE 이벤트가 정상적으로 처리되지 않아도 지정한 시간이 지나면 전리품 주사위 창을 강제로 정리합니다.",
+                order = 4,
+                min = 15,
+                max = 120,
+                step = 5,
+                get = function()
+                    return ns.db.profile.dice.rollTimeout or 60
+                end,
+                set = function(_, value)
+                    ns.db.profile.dice.rollTimeout = value
+                    if ns.Modules and ns.Modules.Dice and ns.Modules.Dice.Refresh then
+                        ns.Modules.Dice:Refresh()
+                    end
+                end,
+            },
             autoRoll = {
                 type = "select",
                 name = "하우징 장식 아이템 자동 굴림",
                 desc = "하우징 장식 아이템에만 자동으로 적용됩니다.",
-                order = 4,
+                order = 5,
                 values = {
                     [-1] = "사용 안 함",
                     [1] = "입찰",
@@ -71,9 +89,9 @@ function ns:CreateDiceOptions()
 
             hideInDungeons = {
                 type = "toggle",
-                name = "던전에서 하우징 장식 아이템만 굴릴 때 전리품 주사위 창 숨김",
-                desc = "파티 던전에서 진행 중인 굴림이 모두 하우징 장식 아이템일 때만 전리품 주사위 창을 숨깁니다.",
-                order = 5,
+                name = "던전/공격대에서 하우징 장식 아이템만 굴릴 때 전리품 주사위 창 숨김",
+                desc = "파티 던전이나 공격대에서 진행 중인 굴림이 모두 하우징 장식 아이템일 때만 전리품 주사위 창을 숨깁니다.",
+                order = 6,
                 width = "full",
                 get = function()
                     return ns.db.profile.dice.hideInDungeons
@@ -88,8 +106,8 @@ function ns:CreateDiceOptions()
 
             help = {
                 type = "description",
-                name = "하우징 장식 아이템 자동 굴림, 던전 내 전리품 주사위 창 숨김, 굴림 종료 후 자동 닫기를 설정합니다.",
-                order = 6,
+                name = "하우징 장식 아이템 자동 굴림, 던전/공격대 전리품 주사위 창 숨김, 굴림 종료 후 자동 닫기, 안전 타임아웃을 설정합니다.",
+                order = 7,
                 width = "full",
             },
         },
