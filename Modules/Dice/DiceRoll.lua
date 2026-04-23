@@ -5,16 +5,17 @@ ns.Modules = ns.Modules or {}
 local Dice = {}
 ns.Modules.Dice = Dice
 
-local GetItemInfo = C_Item.GetItemInfo
+local GetItemInfo = (C_Item and C_Item.GetItemInfo) or _G.GetItemInfo
 local RollOnLoot = RollOnLoot
 local ConfirmLootRoll = ConfirmLootRoll
 local GetLootRollItemLink = GetLootRollItemLink
-local After = C_Timer.After
-local NewTimer = C_Timer.NewTimer
+local After = C_Timer and C_Timer.After
+local NewTimer = C_Timer and C_Timer.NewTimer
 local GetInstanceInfo = GetInstanceInfo
 local HookSecureFunc = hooksecurefunc
 local StaticPopupHide = StaticPopup_Hide
 local StaticPopupFindVisible = StaticPopup_FindVisible
+local Item = Item
 
 local HOUSING_CLASS_ID = (Enum.ItemClass and Enum.ItemClass.Housing) or 20
 
@@ -24,6 +25,7 @@ Dice.closeTimer = nil
 Dice.historyHookInstalled = false
 Dice.elvUILootModule = nil
 Dice.activeRolls = {}
+Dice.rollTimers = {}
 
 local eventFrame = CreateFrame("Frame")
 
@@ -48,20 +50,28 @@ local function GetDB()
             db.hideInDungeons = false
         end
 
+        if db.rollTimeout == nil then
+            db.rollTimeout = 60
+        end
         return db
     end
 
     return nil
 end
 
+local function SafeCancelTimer(timer)
+    if timer and type(timer) == "table" and timer.Cancel then
+        pcall(timer.Cancel, timer)
+    end
+end
 function Dice:IsEnabled()
     local db = self.db or GetDB()
     return db and db.enabled
 end
 
 function Dice:UpdateInstanceInfo()
-    local _, instanceType = GetInstanceInfo()
-    self.currentInstanceType = instanceType or "none"
+    local ok, _, instanceType = pcall(GetInstanceInfo)
+    self.currentInstanceType = (ok and instanceType) or "none"
 end
 
 function Dice:HasActiveRolls()
@@ -82,7 +92,19 @@ function Dice:HideHistoryFrame()
     end
 end
 
-function Dice:ShouldHideInDungeon()
+function Dice:CancelAllRollTimers()
+    for _, timer in pairs(self.rollTimers) do
+        SafeCancelTimer(timer)
+    end
+
+    if wipe then
+        wipe(self.rollTimers)
+    else
+        self.rollTimers = {}
+    end
+end
+
+function Dice:ShouldHideInInstance()
     if not self:IsEnabled() then
         return false
     end
@@ -91,7 +113,7 @@ function Dice:ShouldHideInDungeon()
         return false
     end
 
-    if self.currentInstanceType ~= "party" then
+    if self.currentInstanceType ~= "party" and self.currentInstanceType ~= "raid" then
         return false
     end
 
@@ -99,13 +121,18 @@ function Dice:ShouldHideInDungeon()
         return true
     end
 
+    if not GetItemInfo then
+        return false
+    end
     for rollID in pairs(self.activeRolls) do
         local itemLink = GetLootRollItemLink(rollID)
-        if itemLink then
-            local classID = select(12, GetItemInfo(itemLink))
-            if not classID or classID ~= HOUSING_CLASS_ID then
-                return false
-            end
+        if not itemLink then
+            return false
+        end
+
+        local classID = select(12, GetItemInfo(itemLink))
+        if not classID or classID ~= HOUSING_CLASS_ID then
+            return false
         end
     end
 
@@ -113,35 +140,54 @@ function Dice:ShouldHideInDungeon()
 end
 
 function Dice:UpdateVisibility()
-    if self:ShouldHideInDungeon() then
+    if self:ShouldHideInInstance() then
         self:HideHistoryFrame()
     end
 end
 
 function Dice:StopCloseTimer()
     if self.closeTimer then
-        self.closeTimer:Cancel()
+        SafeCancelTimer(self.closeTimer)
         self.closeTimer = nil
     end
 end
 
 function Dice:TryStartCloseTimer()
-    if not self:IsEnabled() then
+    if not self:IsEnabled() or not self.db then
         return
     end
 
-    if self:HasActiveRolls() then
+    if self:HasActiveRolls() or self.closeTimer then
         return
     end
 
-    if self.closeTimer then
-        return
+    if NewTimer then
+        self.closeTimer = NewTimer(self.db.delay, function()
+            Dice:HideHistoryFrame()
+            Dice.closeTimer = nil
+        end)
+    elseif After then
+        self.closeTimer = true
+        After(self.db.delay, function()
+            if not Dice:HasActiveRolls() then
+                Dice:HideHistoryFrame()
+            end
+            Dice.closeTimer = nil
+        end)
+    end
+end
+
+function Dice:FullReset()
+    self:CancelAllRollTimers()
+    self:StopCloseTimer()
+
+    if wipe then
+        wipe(self.activeRolls)
+    else
+        self.activeRolls = {}
     end
 
-    self.closeTimer = NewTimer(self.db.delay, function()
-        Dice:HideHistoryFrame()
-        Dice.closeTimer = nil
-    end)
+    self:HideHistoryFrame()
 end
 
 function Dice:ExecuteRoll(rollID, classID)
@@ -149,7 +195,7 @@ function Dice:ExecuteRoll(rollID, classID)
         return
     end
 
-    if classID ~= HOUSING_CLASS_ID then
+    if classID ~= HOUSING_CLASS_ID or not RollOnLoot then
         return
     end
 
@@ -168,14 +214,20 @@ function Dice:ExecuteRoll(rollID, classID)
         return
     end
 
-    pcall(ConfirmLootRoll, rollID, rollType)
+    if ConfirmLootRoll then
+        pcall(ConfirmLootRoll, rollID, rollType)
+    end
 
-    After(0.1, function()
-        if StaticPopupFindVisible("CONFIRM_LOOT_ROLL") then
-            StaticPopupHide("CONFIRM_LOOT_ROLL")
-        end
-        Dice:UpdateVisibility()
-    end)
+    if After then
+        After(0.1, function()
+            if StaticPopupFindVisible and StaticPopupFindVisible("CONFIRM_LOOT_ROLL") then
+                StaticPopupHide("CONFIRM_LOOT_ROLL")
+            end
+            Dice:UpdateVisibility()
+        end)
+    else
+        self:UpdateVisibility()
+    end
 end
 
 function Dice:HandleAutoRoll(rollID)
@@ -188,7 +240,7 @@ function Dice:HandleAutoRoll(rollID)
     end
 
     local itemLink = GetLootRollItemLink(rollID)
-    if not itemLink then
+    if not itemLink or not GetItemInfo then
         return
     end
 
@@ -198,6 +250,9 @@ function Dice:HandleAutoRoll(rollID)
         return
     end
 
+    if not Item or not Item.CreateFromItemLink then
+        return
+    end
     local ok, item = pcall(Item.CreateFromItemLink, Item, itemLink)
     if not ok or not item then
         return
@@ -222,7 +277,7 @@ function Dice:InstallHistoryHook()
     end
 
     HookSecureFunc(GroupLootHistoryFrame, "Show", function()
-        if Dice:ShouldHideInDungeon() then
+        if Dice:ShouldHideInInstance() then
             GroupLootHistoryFrame:Hide()
         end
     end)
@@ -235,8 +290,13 @@ function Dice:Refresh()
     self:UpdateInstanceInfo()
 
     if not self:IsEnabled() then
+        self:CancelAllRollTimers()
         self:StopCloseTimer()
-        self.activeRolls = {}
+        if wipe then
+            wipe(self.activeRolls)
+        else
+            self.activeRolls = {}
+        end
         return
     end
 
@@ -247,6 +307,9 @@ function Dice:Initialize()
     self.db = GetDB()
     self:UpdateInstanceInfo()
 
+    if self.db and not RollOnLoot then
+        self.db.autoRoll = -1
+    end
     if ElvUI then
         local E = unpack(ElvUI)
         if E and E.GetModule then
@@ -263,42 +326,104 @@ eventFrame:RegisterEvent("ZONE_CHANGED_NEW_AREA")
 eventFrame:RegisterEvent("START_LOOT_ROLL")
 eventFrame:RegisterEvent("LOOT_ROLLS_COMPLETE")
 eventFrame:RegisterEvent("PLAYER_REGEN_DISABLED")
+eventFrame:RegisterEvent("GROUP_LEFT")
 
 eventFrame:SetScript("OnEvent", function(_, event, arg1)
     if event == "ADDON_LOADED" and arg1 == ns.ADDON_NAME then
         Dice:Initialize()
-
     elseif event == "PLAYER_ENTERING_WORLD" or event == "ZONE_CHANGED_NEW_AREA" then
         Dice:UpdateInstanceInfo()
-        Dice.activeRolls = {}
-        Dice:StopCloseTimer()
+        Dice:FullReset()
         Dice:UpdateVisibility()
-
     elseif event == "START_LOOT_ROLL" then
-        if not Dice:IsEnabled() then
+        if not Dice:IsEnabled() or not Dice.db then
             return
         end
 
+        Dice:UpdateInstanceInfo()
         Dice.activeRolls[arg1] = true
         Dice:StopCloseTimer()
         Dice:InstallHistoryHook()
-        Dice:HandleAutoRoll(arg1)
-        After(0.2, function()
-            Dice:UpdateVisibility()
-        end)
+        if Dice.db.rollTimeout and Dice.db.rollTimeout > 0 and not Dice.rollTimers[arg1] then
+            local watchdogRollID = arg1
 
-    elseif event == "LOOT_ROLLS_COMPLETE" then
-        if Dice.activeRolls[arg1] ~= nil then
-            Dice.activeRolls[arg1] = nil
+            if NewTimer then
+                Dice.rollTimers[watchdogRollID] = NewTimer(Dice.db.rollTimeout, function()
+                    Dice.rollTimers[watchdogRollID] = nil
+                    Dice.activeRolls[watchdogRollID] = nil
+
+                    if not Dice:HasActiveRolls() then
+                        if wipe then
+                            wipe(Dice.activeRolls)
+                        else
+                            Dice.activeRolls = {}
+                        end
+                        Dice:CancelAllRollTimers()
+                        Dice:HideHistoryFrame()
+                    end
+                end)
+            elseif After then
+                Dice.rollTimers[watchdogRollID] = true
+                After(Dice.db.rollTimeout, function()
+                    if not Dice.rollTimers[watchdogRollID] then
+                        return
+                    end
+
+                    Dice.rollTimers[watchdogRollID] = nil
+                    Dice.activeRolls[watchdogRollID] = nil
+
+                    if not Dice:HasActiveRolls() then
+                        if wipe then
+                            wipe(Dice.activeRolls)
+                        else
+                            Dice.activeRolls = {}
+                        end
+                        Dice:CancelAllRollTimers()
+                        Dice:HideHistoryFrame()
+                    end
+                end)
+            end
         end
 
-        After(0.5, function()
-            Dice:TryStartCloseTimer()
-        end)
+        if Dice:ShouldHideInInstance() then
+            Dice:HideHistoryFrame()
+        end
+        Dice:HandleAutoRoll(arg1)
+        if After then
+            After(0.2, function()
+                Dice:UpdateVisibility()
+            end)
+        end
+    elseif event == "LOOT_ROLLS_COMPLETE" then
+        Dice.activeRolls[arg1] = nil
+        SafeCancelTimer(Dice.rollTimers[arg1])
+        Dice.rollTimers[arg1] = nil
 
-    elseif event == "PLAYER_REGEN_DISABLED" then
-        Dice:HideHistoryFrame()
-        Dice:StopCloseTimer()
-        Dice.activeRolls = {}
+        for rollID in pairs(Dice.activeRolls) do
+            if not GetLootRollItemLink(rollID) then
+                SafeCancelTimer(Dice.rollTimers[rollID])
+                Dice.rollTimers[rollID] = nil
+                Dice.activeRolls[rollID] = nil
+            end
+        end
+
+        local function CheckAndStartTimer()
+            if not Dice:HasActiveRolls() then
+                if wipe then
+                    wipe(Dice.activeRolls)
+                else
+                    Dice.activeRolls = {}
+                end
+                Dice:TryStartCloseTimer()
+            end
+        end
+
+        if After then
+            After(0.1, CheckAndStartTimer)
+        else
+            CheckAndStartTimer()
+        end
+    elseif event == "GROUP_LEFT" or event == "PLAYER_REGEN_DISABLED" then
+        Dice:FullReset()
     end
 end)
