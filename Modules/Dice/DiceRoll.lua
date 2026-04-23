@@ -53,6 +53,7 @@ local function GetDB()
         if db.rollTimeout == nil then
             db.rollTimeout = 60
         end
+
         return db
     end
 
@@ -64,6 +65,7 @@ local function SafeCancelTimer(timer)
         pcall(timer.Cancel, timer)
     end
 end
+
 function Dice:IsEnabled()
     local db = self.db or GetDB()
     return db and db.enabled
@@ -124,6 +126,7 @@ function Dice:ShouldHideInInstance()
     if not GetItemInfo then
         return false
     end
+
     for rollID in pairs(self.activeRolls) do
         local itemLink = GetLootRollItemLink(rollID)
         if not itemLink then
@@ -253,6 +256,7 @@ function Dice:HandleAutoRoll(rollID)
     if not Item or not Item.CreateFromItemLink then
         return
     end
+
     local ok, item = pcall(Item.CreateFromItemLink, Item, itemLink)
     if not ok or not item then
         return
@@ -292,11 +296,13 @@ function Dice:Refresh()
     if not self:IsEnabled() then
         self:CancelAllRollTimers()
         self:StopCloseTimer()
+
         if wipe then
             wipe(self.activeRolls)
         else
             self.activeRolls = {}
         end
+
         return
     end
 
@@ -310,6 +316,7 @@ function Dice:Initialize()
     if self.db and not RollOnLoot then
         self.db.autoRoll = -1
     end
+
     if ElvUI then
         local E = unpack(ElvUI)
         if E and E.GetModule then
@@ -344,6 +351,7 @@ eventFrame:SetScript("OnEvent", function(_, event, arg1)
         Dice.activeRolls[arg1] = true
         Dice:StopCloseTimer()
         Dice:InstallHistoryHook()
+
         if Dice.db.rollTimeout and Dice.db.rollTimeout > 0 and not Dice.rollTimers[arg1] then
             local watchdogRollID = arg1
 
@@ -388,6 +396,7 @@ eventFrame:SetScript("OnEvent", function(_, event, arg1)
         if Dice:ShouldHideInInstance() then
             Dice:HideHistoryFrame()
         end
+
         Dice:HandleAutoRoll(arg1)
         if After then
             After(0.2, function()
