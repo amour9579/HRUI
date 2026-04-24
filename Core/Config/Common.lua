@@ -3,6 +3,7 @@ local _, ns = ...
 local anchorValues = ns.ConfigValues.anchorValues
 local textureValues = ns.ConfigValues.textureValues
 local unitFontValues = ns.ConfigValues.unitFrameFontValues
+local healthDecimalModeValues = ns.ConfigValues.healthDecimalModeValues
 
 local function CreateAnchorOption(unit, group, order)
     return {
