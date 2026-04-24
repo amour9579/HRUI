@@ -48,6 +48,9 @@ function HRUI:OnInitialize()
 end
 
 function HRUI:OnEnable()
+    if ns.ApplyItemTooltipCVar then
+        ns:ApplyItemTooltipCVar()
+    end
     if ns.Modules.UnitFrames and ns.Modules.UnitFrames.Enable then
         ns.Modules.UnitFrames:Enable()
     end
@@ -122,6 +125,9 @@ function HRUI:HandleSlash(msg)
 end
 
 function HRUI:RefreshAll()
+    if ns.ApplyItemTooltipCVar then
+        ns:ApplyItemTooltipCVar()
+    end
     if ns.Modules.UnitFrames and ns.Modules.UnitFrames.RefreshAll then
         ns.Modules.UnitFrames:RefreshAll()
     end
