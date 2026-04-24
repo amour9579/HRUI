@@ -168,12 +168,16 @@ function ns:FormatHealth(value)
         if text ~= nil then
             return text
         end
-    elseif mode == "zero" then
+        self:BuildHealthAbbrevConfig()
+        return FormatWithConfig(value, HEALTH_ABBREV_CONFIG)
+    end
+
+    if mode == "zero" then
         local text = FormatHealthDirect(value, 0)
         if text ~= nil then
             return text
         end
     end
-    self:BuildHealthAbbrevConfig()
-    return FormatWithConfig(value, HEALTH_ABBREV_CONFIG)
+    self:BuildAbbrevConfig()
+    return FormatWithConfig(value, SHORT_ABBREV_CONFIG)
 end
