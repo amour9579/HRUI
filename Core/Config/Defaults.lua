@@ -122,6 +122,9 @@ ns.Defaults = {
             hideMicroMenu = false,
         },
 
+        itemTooltip = {
+            alwaysCompareItems = false,
+        },
         chat = {
             enabled = true,
 
