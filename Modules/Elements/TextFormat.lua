@@ -6,7 +6,7 @@ local HEALTH_INTEGER_ABBREV_CONFIG
 
 local function CreateConfig(data)
     if CreateAbbreviateConfig then
-        return { config = CreateAbbreviateConfig(data) }
+        return CreateAbbreviateConfig(data)
     end
 
     return data
@@ -155,6 +155,25 @@ local function FormatWithConfig(value, config)
     return ""
 end
 
+local function Truncate(value, decimals)
+    local factor = 10 ^ decimals
+    if value < 0 then
+        return math.ceil(value * factor) / factor
+    end
+
+    return math.floor(value * factor) / factor
+end
+
+local function GetHealthUnit(absValue)
+    if absValue >= 1000000000000 then
+        return 1000000000000, "조"
+    elseif absValue >= 100000000 then
+        return 100000000, "억"
+    elseif absValue >= 10000 then
+        return 10000, "만"
+    end
+end
+
 local function FormatHealthDirectInner(value, decimals)
     local num = tonumber(value)
     if not num then
@@ -162,30 +181,16 @@ local function FormatHealthDirectInner(value, decimals)
     end
 
     local absValue = math.abs(num)
-    local divisor, suffix
-
-    if absValue >= 1000000000000 then
-        divisor, suffix = 1000000000000, "조"
-    elseif absValue >= 100000000 then
-        divisor, suffix = 100000000, "억"
-    elseif absValue >= 10000 then
-        divisor, suffix = 10000, "만"
-    end
+    local divisor, suffix = GetHealthUnit(absValue)
 
     if divisor then
         local scaled = num / divisor
 
         if decimals == 0 then
-            if scaled < 0 then
-                scaled = math.ceil(scaled)
-            else
-                scaled = math.floor(scaled)
-            end
-
-            return string.format("%d%s", scaled, suffix)
+            return string.format("%.0f%s", Truncate(scaled, 0), suffix)
         end
 
-        return string.format("%." .. decimals .. "f%s", scaled, suffix)
+        return string.format("%." .. decimals .. "f%s", Truncate(scaled, decimals), suffix)
     end
 
     if BreakUpLargeNumbers then
@@ -202,6 +207,40 @@ local function FormatHealthDirect(value, decimals)
     end
 end
 
+local function FormatHealthAutoDirectInner(value)
+    local num = tonumber(value)
+    if not num then
+        return nil
+    end
+
+    local absValue = math.abs(num)
+    local divisor, suffix = GetHealthUnit(absValue)
+
+    if divisor then
+        local scaled = num / divisor
+        local absScaled = absValue / divisor
+
+        if absScaled < 10 then
+            return string.format("%.1f%s", Truncate(scaled, 1), suffix)
+        end
+
+        return string.format("%.0f%s", Truncate(scaled, 0), suffix)
+    end
+
+    if BreakUpLargeNumbers then
+        return BreakUpLargeNumbers(num)
+    end
+
+    return string.format("%.0f", num)
+end
+
+local function FormatHealthAutoDirect(value)
+    local ok, text = pcall(FormatHealthAutoDirectInner, value)
+    if ok then
+        return text
+    end
+end
+
 function ns:FormatShortValue(value)
     self:BuildAbbrevConfig()
     return FormatWithConfig(value, SHORT_ABBREV_CONFIG)
@@ -211,6 +250,10 @@ function ns:FormatHealth(value)
     local mode = self:GetHealthDecimalMode()
 
     if mode == "auto" then
+        local text = FormatHealthAutoDirect(value)
+        if text ~= nil then
+            return text
+        end
         return self:FormatShortValue(value)
     end
 
