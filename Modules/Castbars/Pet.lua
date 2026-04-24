@@ -41,10 +41,6 @@ end
 local function UpdatePetCastState(frame)
     SuppressBlizzardPetCastbar()
 
-    if frame and IsPlayerVehicleCast() then
-        ns:ResetCastbar(frame)
-        return
-    end
     if not frame or not UnitExists("pet") or not ns.db.profile.castbars.pet.enabled then
         if frame then
             ns:ResetCastbar(frame)
