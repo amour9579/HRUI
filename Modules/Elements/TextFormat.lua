@@ -2,6 +2,28 @@ local _, ns = ...
 
 local SHORT_ABBREV_CONFIG
 
+local function AddMissingDecimalForSuffix(text, suffix)
+    local result = string.gsub(
+        text,
+        "^(%-?[%d,]+)(%s*)" .. suffix .. "$",
+        "%1.0%2" .. suffix
+    )
+
+    return result
+end
+
+local function NormalizeHealthDecimal(text)
+    if text == nil then
+        return ""
+    end
+
+    text = tostring(text)
+    text = AddMissingDecimalForSuffix(text, "만")
+    text = AddMissingDecimalForSuffix(text, "억")
+    text = AddMissingDecimalForSuffix(text, "조")
+
+    return text
+end
 function ns:BuildAbbrevConfig()
     if SHORT_ABBREV_CONFIG then
         return
@@ -36,7 +58,7 @@ function ns:BuildAbbrevConfig()
     })
 end
 
-function ns:FormatShortValue(value)
+local function FormatShortValueRaw(self, value)
     if value == nil then
         return ""
     end
@@ -64,6 +86,9 @@ function ns:FormatShortValue(value)
     return tostring(value)
 end
 
+function ns:FormatShortValue(value)
+    return FormatShortValueRaw(self, value)
+end
 function ns:FormatHealth(value)
-    return self:FormatShortValue(value)
+    return NormalizeHealthDecimal(FormatShortValueRaw(self, value))
 end
