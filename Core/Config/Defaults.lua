@@ -77,6 +77,11 @@ ns.ConfigValues.nameFormatValues = {
     levelName = "레벨 + 이름",
 }
 
+ns.ConfigValues.healthDecimalModeValues = {
+    one = "항상 소수 첫째 자리",
+    zero = "소수점 표시 안 함",
+    auto = "자동 / Blizzard 축약",
+}
 ns.ConfigValues.textureValues = {
     default = "Default",
     smooth = "Smooth",
@@ -187,6 +192,7 @@ ns.Defaults = {
             appearance = {
                 nameFont = "default",
                 healthFont = "default",
+                healthDecimalMode = "one",
                 powerFont = "default",
             },
 
