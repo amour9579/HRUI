@@ -15,6 +15,7 @@ Init.lua
 Core\Config\Defaults.lua
 Core\Config\Helpers.lua
 Core\Config\Common.lua
+Core\Config\ItemTooltip.lua
 Core\Config\UnitFrames.lua
 Core\Config\Castbars.lua
 Core\Config\ActionBars.lua
