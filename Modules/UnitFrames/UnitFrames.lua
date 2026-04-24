@@ -46,6 +46,13 @@ local function ApplyFrameEnabled(key, frame, enabled)
 
     EnsureVisibilityHook(frame)
 
+    enabled = enabled ~= false
+
+    if frame.__HRUIAppliedEnabled == enabled then
+        return
+    end
+
+    frame.__HRUIAppliedEnabled = enabled
     if key ~= "player" and UnregisterUnitWatch then
         UnregisterUnitWatch(frame)
     end
@@ -57,9 +64,9 @@ local function ApplyFrameEnabled(key, frame, enabled)
 
         if key ~= "player" and RegisterUnitWatch then
             RegisterUnitWatch(frame)
+        else
+            frame:Show()
         end
-
-        frame:Show()
     else
         frame.__HRUIForceHidden = true
         frame:EnableMouse(false)
