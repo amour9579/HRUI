@@ -1,64 +1,14 @@
 local _, ns = ...
 
-local function GetConfigUnit(frame)
-    if not frame then
-        return nil
-    end
-
-    if frame.HRUIConfigUnit then
-        return frame.HRUIConfigUnit
-    end
-
-    local unit = frame.unit
-
-    if unit == "vehicle" then
-        unit = "player"
-    end
-
-    frame.HRUIConfigUnit = unit
-    return unit
-end
-
-local function GetActiveUnit(frame, configUnit)
-    if not frame then
-        return nil
-    end
-
-    local unit = frame.unit or configUnit
-
-    if unit and UnitExists(unit) then
-        return unit
-    end
-
-    if configUnit and UnitExists(configUnit) then
-        return configUnit
-    end
-
-    return nil
-end
-
 local function FormatHealthText(format, cur, max)
-    local curText = ns:FormatHealth(cur)
+    cur = tonumber(cur) or 0
+    max = tonumber(max) or 0
 
     if format == "valueMax" then
-        local maxText = ns:FormatHealth(max)
-
-        if curText == "" and maxText == "" then
-            return ""
-        end
-
-        if curText == "" then
-            return maxText
-        end
-
-        if maxText == "" then
-            return curText
-        end
-
-        return curText .. " / " .. maxText
+        return string.format("%s / %s", ns:FormatHealth(cur), ns:FormatHealth(max))
     end
 
-    return curText
+    return ns:FormatHealth(cur)
 end
 
 local function GetHealthFontPath()
@@ -74,41 +24,28 @@ local function GetHealthFontSize(unit)
     return (cfg and cfg.fontSize) or 11
 end
 
-function ns:UpdateHealthValue(frame, cur, max)
+function ns:UpdateHealthValue(frame)
     if not frame or not frame.HealthValue or not frame.Health then
         return
     end
 
-    local configUnit = GetConfigUnit(frame)
-    local activeUnit = GetActiveUnit(frame, configUnit)
-
-    local db = ns.db
-        and ns.db.profile
-        and ns.db.profile.unitframes
-        and ns.db.profile.unitframes[configUnit]
-
+    local unit = frame.unit
+    local db = ns.db and ns.db.profile and ns.db.profile.unitframes and ns.db.profile.unitframes[unit]
     local cfg = db and db.healthText
     local format = cfg and cfg.format or "value"
-
     if format ~= "value" and format ~= "valueMax" then
         format = "value"
     end
 
-    if cur == nil and activeUnit then
-        cur = UnitHealth(activeUnit)
-    end
-
-    if max == nil and activeUnit then
-        max = UnitHealthMax(activeUnit)
-    end
+    local cur = frame.Health:GetValue() or 0
+    local _, max = frame.Health:GetMinMaxValues()
+    max = max or 0
 
     frame.HealthValue:SetText(FormatHealthText(format, cur, max))
 end
 
 function ns:CreateHealth(frame)
     local unit = frame.unit
-    frame.HRUIConfigUnit = frame.HRUIConfigUnit or unit
-    
     local db = ns.db.profile.unitframes[unit]
     local powerCfg = db and db.power
     local powerEnabled = powerCfg and powerCfg.enabled
@@ -129,20 +66,19 @@ function ns:CreateHealth(frame)
     bg:SetVertexColor(0.15, 0.15, 0.15, 0.7)
     health.bg = bg
 
-    health.PostUpdate = function(bar, unit, cur, max)
+    health.PostUpdate = function(bar)
         local owner = bar.__owner or frame
-        ns:UpdateHealthValue(owner, cur, max)
+        ns:UpdateHealthValue(owner)
     end
 
     frame.Health = health
 end
 
 function ns:CreateHealthValue(frame)
-    local configUnit = GetConfigUnit(frame)
     local parent = frame.Overlay or frame
 
     local value = parent:CreateFontString(nil, "OVERLAY")
-    value:SetFont(GetHealthFontPath(), GetHealthFontSize(configUnit), "OUTLINE")
+    value:SetFont(GetHealthFontPath(), GetHealthFontSize(frame.unit), "OUTLINE")
     value:SetTextColor(1, 1, 1)
 
     frame.HealthValue = value
@@ -156,14 +92,14 @@ function ns:UpdateHealthText(frame)
         return
     end
 
-    local configUnit = GetConfigUnit(frame)
-    local db = ns.db.profile.unitframes[configUnit]
+    local unit = frame.unit
+    local db = ns.db.profile.unitframes[unit]
     local cfg = db and db.healthText
     if not cfg then
         return
     end
 
-    frame.HealthValue:SetFont(GetHealthFontPath(), GetHealthFontSize(configUnit), "OUTLINE")
+    frame.HealthValue:SetFont(GetHealthFontPath(), GetHealthFontSize(unit), "OUTLINE")
 
     if cfg.enabled then
         frame.HealthValue:Show()
