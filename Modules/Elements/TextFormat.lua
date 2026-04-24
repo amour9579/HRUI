@@ -1,17 +1,18 @@
 local _, ns = ...
 
 local SHORT_ABBREV_CONFIG
+local HEALTH_ABBREV_CONFIG
 
-function ns:BuildAbbrevConfig()
-    if SHORT_ABBREV_CONFIG then
-        return
+local function CreateConfig(data)
+    if CreateAbbreviateConfig then
+        return { config = CreateAbbreviateConfig(data) }
     end
 
-    if not CreateAbbreviateConfig then
-        return
-    end
+    return data
+end
 
-    SHORT_ABBREV_CONFIG = CreateAbbreviateConfig({
+local function CreateShortConfig()
+    return CreateConfig({
         {
             breakpoint = 10000,
             abbreviation = "만",
@@ -36,34 +37,84 @@ function ns:BuildAbbrevConfig()
     })
 end
 
-function ns:FormatShortValue(value)
-    if value == nil then
-        return ""
+local function CreateHealthConfig()
+    return CreateConfig({
+        {
+            breakpoint = 1000000000000,
+            abbreviation = "조",
+            significandDivisor = 100000000000,
+            fractionDivisor = 10,
+            abbreviationIsGlobal = false,
+        },
+        {
+            breakpoint = 100000000,
+            abbreviation = "억",
+            significandDivisor = 10000000,
+            fractionDivisor = 10,
+            abbreviationIsGlobal = false,
+        },
+        {
+            breakpoint = 10000,
+            abbreviation = "만",
+            significandDivisor = 1000,
+            fractionDivisor = 10,
+            abbreviationIsGlobal = false,
+        },
+    })
+end
+
+function ns:BuildAbbrevConfig()
+    if SHORT_ABBREV_CONFIG then
+        return
     end
 
-    if type(value) == "string" then
+    SHORT_ABBREV_CONFIG = CreateShortConfig()
+end
+
+function ns:BuildHealthAbbrevConfig()
+    if HEALTH_ABBREV_CONFIG then
+        return
+    end
+
+    HEALTH_ABBREV_CONFIG = CreateHealthConfig()
+end
+
+local function FormatWithConfig(value, config)
+    local valueType = type(value)
+    if valueType == "nil" then
+        return ""
+    elseif valueType == "string" then
         return value
     end
 
-    self:BuildAbbrevConfig()
-
-    if SHORT_ABBREV_CONFIG and AbbreviateNumbers then
-        local ok, text = pcall(AbbreviateNumbers, value, SHORT_ABBREV_CONFIG)
-        if ok and text then
-            return tostring(text)
+    if config and AbbreviateNumbers then
+        local ok, text = pcall(AbbreviateNumbers, value, config)
+        if ok then
+            return text
         end
     end
 
     if BreakUpLargeNumbers then
-        local ok2, text2 = pcall(BreakUpLargeNumbers, value)
-        if ok2 and text2 then
-            return tostring(text2)
+        local ok, text = pcall(BreakUpLargeNumbers, value)
+        if ok then
+            return text
         end
     end
 
-    return tostring(value)
+    local ok, text = pcall(tostring, value)
+    if ok then
+        return text
+    end
+
+    return ""
+end
+
+function ns:FormatShortValue(value)
+    self:BuildAbbrevConfig()
+    return FormatWithConfig(value, SHORT_ABBREV_CONFIG)
 end
 
 function ns:FormatHealth(value)
-    return self:FormatShortValue(value)
+    self:BuildHealthAbbrevConfig()
+    return FormatWithConfig(value, HEALTH_ABBREV_CONFIG)
 end
