@@ -192,7 +192,7 @@ ns.Defaults = {
             appearance = {
                 nameFont = "default",
                 healthFont = "default",
-                healthDecimalMode = "one",
+                healthDecimalMode = "auto",
                 powerFont = "default",
             },
 
