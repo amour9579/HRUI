@@ -243,10 +243,27 @@ function ns:CreateUnitFrameAppearanceOptions()
                 end,
             },
 
+            healthDecimalMode = {
+                type = "select",
+                name = "체력 텍스트 소수점",
+                order = 13,
+                values = healthDecimalModeValues,
+                get = function()
+                    return ns.db.profile.unitframes.appearance.healthDecimalMode or "one"
+                end,
+                set = function(_, value)
+                    if value ~= "one" and value ~= "zero" and value ~= "auto" then
+                        value = "one"
+                    end
+
+                    ns.db.profile.unitframes.appearance.healthDecimalMode = value
+                    ns:RefreshAllUnits()
+                end,
+            },
             powerFont = {
                 type = "select",
                 name = "자원 폰트",
-                order = 13,
+                order = 14,
                 values = unitFontValues,
                 get = function()
                     return ns.db.profile.unitframes.appearance.powerFont or "default"
