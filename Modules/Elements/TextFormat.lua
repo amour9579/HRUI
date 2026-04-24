@@ -79,34 +79,80 @@ function ns:BuildHealthAbbrevConfig()
     HEALTH_ABBREV_CONFIG = CreateHealthConfig()
 end
 
-local function FormatWithConfig(value, config)
-    local valueType = type(value)
-    if valueType == "nil" then
+function ns:GetHealthDecimalMode()
+    local ufdb = ns.db and ns.db.profile and ns.db.profile.unitframes
+    local appearance = ufdb and ufdb.appearance
+    local mode = appearance and appearance.healthDecimalMode or "one"
+
+    if mode ~= "auto" and mode ~= "one" and mode ~= "zero" then
+        mode = "one"
+    end
+
+    return mode
+end
+
+local function FormatWithConfigInner(value, config)
+    if value == nil then
         return ""
-    elseif valueType == "string" then
+    end
+
+    if type(value) == "string" then
         return value
     end
 
     if config and AbbreviateNumbers then
-        local ok, text = pcall(AbbreviateNumbers, value, config)
-        if ok then
-            return text
-        end
+        return AbbreviateNumbers(value, config)
     end
 
     if BreakUpLargeNumbers then
-        local ok, text = pcall(BreakUpLargeNumbers, value)
-        if ok then
-            return text
-        end
+        return BreakUpLargeNumbers(value)
     end
 
-    local ok, text = pcall(tostring, value)
+    return tostring(value)
+end
+
+local function FormatWithConfig(value, config)
+    local ok, text = pcall(FormatWithConfigInner, value, config)
     if ok then
         return text
     end
 
     return ""
+end
+
+local function FormatHealthDirectInner(value, decimals)
+    local num = tonumber(value)
+    if not num then
+        return nil
+    end
+
+    local absValue = math.abs(num)
+    local divisor, suffix
+
+    if absValue >= 1000000000000 then
+        divisor, suffix = 1000000000000, "조"
+    elseif absValue >= 100000000 then
+        divisor, suffix = 100000000, "억"
+    elseif absValue >= 10000 then
+        divisor, suffix = 10000, "만"
+    end
+
+    if divisor then
+        return string.format("%." .. decimals .. "f%s", num / divisor, suffix)
+    end
+
+    if BreakUpLargeNumbers then
+        return BreakUpLargeNumbers(num)
+    end
+
+    return string.format("%.0f", num)
+end
+
+local function FormatHealthDirect(value, decimals)
+    local ok, text = pcall(FormatHealthDirectInner, value, decimals)
+    if ok then
+        return text
+    end
 end
 
 function ns:FormatShortValue(value)
@@ -115,6 +161,19 @@ function ns:FormatShortValue(value)
 end
 
 function ns:FormatHealth(value)
+    local mode = self:GetHealthDecimalMode()
+
+    if mode == "one" then
+        local text = FormatHealthDirect(value, 1)
+        if text ~= nil then
+            return text
+        end
+    elseif mode == "zero" then
+        local text = FormatHealthDirect(value, 0)
+        if text ~= nil then
+            return text
+        end
+    end
     self:BuildHealthAbbrevConfig()
     return FormatWithConfig(value, HEALTH_ABBREV_CONFIG)
 end
