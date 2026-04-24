@@ -89,6 +89,7 @@ local function CreateHealthIntegerConfig()
         },
     })
 end
+
 function ns:BuildAbbrevConfig()
     if SHORT_ABBREV_CONFIG then
         return
@@ -112,6 +113,7 @@ function ns:BuildHealthIntegerAbbrevConfig()
 
     HEALTH_INTEGER_ABBREV_CONFIG = CreateHealthIntegerConfig()
 end
+
 function ns:GetHealthDecimalMode()
     local ufdb = ns.db and ns.db.profile and ns.db.profile.unitframes
     local appearance = ufdb and ufdb.appearance
@@ -208,21 +210,25 @@ end
 function ns:FormatHealth(value)
     local mode = self:GetHealthDecimalMode()
 
-    if mode == "one" then
-        local text = FormatHealthDirect(value, 1)
+    if mode == "auto" then
+        return self:FormatShortValue(value)
+    end
+
+    if mode == "zero" then
+        local text = FormatHealthDirect(value, 0)
         if text ~= nil then
             return text
         end
 
-        self:BuildHealthAbbrevConfig()
-        return FormatWithConfig(value, HEALTH_ABBREV_CONFIG)
+        self:BuildHealthIntegerAbbrevConfig()
+        return FormatWithConfig(value, HEALTH_INTEGER_ABBREV_CONFIG)
     end
 
-    local text = FormatHealthDirect(value, 0)
+    local text = FormatHealthDirect(value, 1)
     if text ~= nil then
         return text
     end
 
-    self:BuildHealthIntegerAbbrevConfig()
-    return FormatWithConfig(value, HEALTH_INTEGER_ABBREV_CONFIG)
+    self:BuildHealthAbbrevConfig()
+    return FormatWithConfig(value, HEALTH_ABBREV_CONFIG)
 end
