@@ -51,9 +51,17 @@ end
 
 local function TryFormatHealthOneDecimal(value)
     local ok, text = pcall(function()
+        if value == nil then
+            return ""
+        end
+
+        -- secret value면 tonumber / 비교 / 연산 시도하지 않음
+        if issecretvalue and issecretvalue(value) then
+            return ""
+        end
         local n = tonumber(value)
         if not n then
-            return nil
+            return ""
         end
 
         if n >= 1000000000000 then
@@ -68,15 +76,16 @@ local function TryFormatHealthOneDecimal(value)
             return string.format("%.1f만", math.floor(n / 1000) / 10)
         end
 
-        return FormatInteger(n)
+        return string.format("%d", math.floor(n))
     end)
 
-    if ok and text ~= nil then
+    if ok and text then
         return text
     end
 
-    return nil
+    return ""
 end
+
 local function FormatShortValueRaw(self, value)
     if value == nil then
         return ""
