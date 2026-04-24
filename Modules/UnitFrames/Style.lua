@@ -97,6 +97,11 @@ function ns:UpdateFrameTexture(frame)
 
     local texture = ns:GetTexture()
 
+    if frame.__HRUITexture == texture then
+        return
+    end
+
+    frame.__HRUITexture = texture
     if frame.Health then
         frame.Health:SetStatusBarTexture(texture)
         if frame.Health.bg then
@@ -111,5 +116,8 @@ function ns:UpdateFrameTexture(frame)
             frame.Power.bg:SetTexture(texture)
             frame.Power.bg:SetVertexColor(0.05, 0.05, 0.05, 0.85)
         end
+    end
+    if frame.UpdateAllElements then
+        frame:UpdateAllElements("HRUI_TextureChanged")
     end
 end
