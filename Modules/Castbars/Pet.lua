@@ -1,6 +1,50 @@
 local _, ns = ...
 
+local function SafeCallBool(funcName, ...)
+    local func = _G[funcName]
+    if type(func) ~= "function" then
+        return false
+    end
+
+    local ok, result = pcall(func, ...)
+    return ok and result or false
+end
+
+local function IsPlayerVehicleCast()
+    return SafeCallBool("UnitHasVehicleUI", "player")
+        or SafeCallBool("UnitHasVehiclePlayerFrameUI", "player")
+        or SafeCallBool("UnitIsUnit", "pet", "vehicle")
+        or SafeCallBool("UnitInVehicle", "player")
+end
+
+local blizzardPetCastbarHooked = false
+
+local function SuppressBlizzardPetCastbar()
+    local bar = _G.PetCastingBarFrame
+    if not bar then
+        return
+    end
+
+    if not blizzardPetCastbarHooked and bar.HookScript then
+        blizzardPetCastbarHooked = true
+        bar:HookScript("OnShow", function(self)
+            if IsPlayerVehicleCast() then
+                self:Hide()
+            end
+        end)
+    end
+
+    if IsPlayerVehicleCast() then
+        bar:Hide()
+    end
+end
 local function UpdatePetCastState(frame)
+    SuppressBlizzardPetCastbar()
+
+    if frame and IsPlayerVehicleCast() then
+        ns:ResetCastbar(frame)
+        return
+    end
     if not frame or not UnitExists("pet") or not ns.db.profile.castbars.pet.enabled then
         if frame then
             ns:ResetCastbar(frame)
@@ -48,6 +92,9 @@ function ns:SpawnPetCastbar()
 
     frame:RegisterEvent("UNIT_PET")
     frame:RegisterEvent("PLAYER_ENTERING_WORLD")
+    frame:RegisterEvent("UNIT_ENTERED_VEHICLE")
+    frame:RegisterEvent("UNIT_EXITED_VEHICLE")
+    frame:RegisterEvent("VEHICLE_UPDATE")
 
     frame:RegisterUnitEvent("UNIT_SPELLCAST_START", "pet")
     frame:RegisterUnitEvent("UNIT_SPELLCAST_STOP", "pet")
@@ -66,6 +113,17 @@ function ns:SpawnPetCastbar()
             return
         end
 
+        if event == "UNIT_ENTERED_VEHICLE" or event == "UNIT_EXITED_VEHICLE" then
+            if unit == "player" then
+                UpdatePetCastState(self)
+            end
+            return
+        end
+
+        if event == "VEHICLE_UPDATE" then
+            UpdatePetCastState(self)
+            return
+        end
         if event == "UNIT_PET" then
             if unit == "player" then
                 UpdatePetCastState(self)
