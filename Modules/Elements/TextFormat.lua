@@ -2,6 +2,7 @@ local _, ns = ...
 
 local SHORT_ABBREV_CONFIG
 local HEALTH_ABBREV_CONFIG
+local HEALTH_INTEGER_ABBREV_CONFIG
 
 local function CreateConfig(data)
     if CreateAbbreviateConfig then
@@ -63,6 +64,31 @@ local function CreateHealthConfig()
     })
 end
 
+local function CreateHealthIntegerConfig()
+    return CreateConfig({
+        {
+            breakpoint = 1000000000000,
+            abbreviation = "조",
+            significandDivisor = 1000000000000,
+            fractionDivisor = 1,
+            abbreviationIsGlobal = false,
+        },
+        {
+            breakpoint = 100000000,
+            abbreviation = "억",
+            significandDivisor = 100000000,
+            fractionDivisor = 1,
+            abbreviationIsGlobal = false,
+        },
+        {
+            breakpoint = 10000,
+            abbreviation = "만",
+            significandDivisor = 10000,
+            fractionDivisor = 1,
+            abbreviationIsGlobal = false,
+        },
+    })
+end
 function ns:BuildAbbrevConfig()
     if SHORT_ABBREV_CONFIG then
         return
@@ -79,6 +105,13 @@ function ns:BuildHealthAbbrevConfig()
     HEALTH_ABBREV_CONFIG = CreateHealthConfig()
 end
 
+function ns:BuildHealthIntegerAbbrevConfig()
+    if HEALTH_INTEGER_ABBREV_CONFIG then
+        return
+    end
+
+    HEALTH_INTEGER_ABBREV_CONFIG = CreateHealthIntegerConfig()
+end
 function ns:GetHealthDecimalMode()
     local ufdb = ns.db and ns.db.profile and ns.db.profile.unitframes
     local appearance = ufdb and ufdb.appearance
@@ -138,7 +171,19 @@ local function FormatHealthDirectInner(value, decimals)
     end
 
     if divisor then
-        return string.format("%." .. decimals .. "f%s", num / divisor, suffix)
+        local scaled = num / divisor
+
+        if decimals == 0 then
+            if scaled < 0 then
+                scaled = math.ceil(scaled)
+            else
+                scaled = math.floor(scaled)
+            end
+
+            return string.format("%d%s", scaled, suffix)
+        end
+
+        return string.format("%." .. decimals .. "f%s", scaled, suffix)
     end
 
     if BreakUpLargeNumbers then
@@ -168,16 +213,16 @@ function ns:FormatHealth(value)
         if text ~= nil then
             return text
         end
+
         self:BuildHealthAbbrevConfig()
         return FormatWithConfig(value, HEALTH_ABBREV_CONFIG)
     end
 
-    if mode == "zero" then
-        local text = FormatHealthDirect(value, 0)
-        if text ~= nil then
-            return text
-        end
+    local text = FormatHealthDirect(value, 0)
+    if text ~= nil then
+        return text
     end
-    self:BuildAbbrevConfig()
-    return FormatWithConfig(value, SHORT_ABBREV_CONFIG)
+
+    self:BuildHealthIntegerAbbrevConfig()
+    return FormatWithConfig(value, HEALTH_INTEGER_ABBREV_CONFIG)
 end
