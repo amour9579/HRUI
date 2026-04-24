@@ -1,16 +1,5 @@
 local _, ns = ...
 
-local function FormatHealthText(format, cur, max)
-    cur = tonumber(cur) or 0
-    max = tonumber(max) or 0
-
-    if format == "valueMax" then
-        return string.format("%s / %s", ns:FormatHealth(cur), ns:FormatHealth(max))
-    end
-
-    return ns:FormatHealth(cur)
-end
-
 local function GetHealthFontPath()
     local ufdb = ns.db and ns.db.profile and ns.db.profile.unitframes
     local appearance = ufdb and ufdb.appearance
@@ -24,7 +13,15 @@ local function GetHealthFontSize(unit)
     return (cfg and cfg.fontSize) or 11
 end
 
-function ns:UpdateHealthValue(frame)
+local function SetHealthText(fontString, format, cur, max)
+    if format == "valueMax" then
+        fontString:SetFormattedText("%s / %s", ns:FormatHealth(cur), ns:FormatHealth(max))
+    else
+        fontString:SetText(ns:FormatHealth(cur))
+    end
+end
+
+function ns:UpdateHealthValue(frame, ...)
     if not frame or not frame.HealthValue or not frame.Health then
         return
     end
@@ -37,11 +34,14 @@ function ns:UpdateHealthValue(frame)
         format = "value"
     end
 
-    local cur = frame.Health:GetValue() or 0
-    local _, max = frame.Health:GetMinMaxValues()
-    max = max or 0
+    local cur, max = ...
+    if select("#", ...) < 2 then
+        cur = frame.Health:GetValue()
+        local _, maxValue = frame.Health:GetMinMaxValues()
+        max = maxValue
+    end
 
-    frame.HealthValue:SetText(FormatHealthText(format, cur, max))
+    SetHealthText(frame.HealthValue, format, cur, max)
 end
 
 function ns:CreateHealth(frame)
@@ -53,6 +53,7 @@ function ns:CreateHealth(frame)
     local bottomOffset = powerEnabled and (powerHeight + 1) or 1
 
     local health = CreateFrame("StatusBar", nil, frame)
+    health.__owner = frame
     health:SetStatusBarTexture(ns:GetTexture())
     health:SetPoint("TOPLEFT", frame, "TOPLEFT", 1, -1)
     health:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -1, -1)
@@ -66,9 +67,8 @@ function ns:CreateHealth(frame)
     bg:SetVertexColor(0.15, 0.15, 0.15, 0.7)
     health.bg = bg
 
-    health.PostUpdate = function(bar)
-        local owner = bar.__owner or frame
-        ns:UpdateHealthValue(owner)
+    health.PostUpdate = function(bar, unit, cur, max)
+        ns:UpdateHealthValue(bar.__owner or frame, cur, max)
     end
 
     frame.Health = health
