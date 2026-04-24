@@ -1,14 +1,27 @@
 local _, ns = ...
 
 local function FormatHealthText(format, cur, max)
-    cur = tonumber(cur) or 0
-    max = tonumber(max) or 0
+    local curText = ns:FormatHealth(cur)
 
     if format == "valueMax" then
-        return string.format("%s / %s", ns:FormatHealth(cur), ns:FormatHealth(max))
+        local maxText = ns:FormatHealth(max)
+
+        if curText == "" and maxText == "" then
+            return ""
+        end
+
+        if maxText == "" then
+            return curText
+        end
+
+        if curText == "" then
+            return maxText
+        end
+
+        return curText .. " / " .. maxText
     end
 
-    return ns:FormatHealth(cur)
+    return curText
 end
 
 local function GetHealthFontPath()
@@ -37,9 +50,13 @@ function ns:UpdateHealthValue(frame)
         format = "value"
     end
 
-    local cur = frame.Health:GetValue() or 0
-    local _, max = frame.Health:GetMinMaxValues()
-    max = max or 0
+    if not unit or not UnitExists(unit) then
+        frame.HealthValue:SetText("")
+        return
+    end
+
+    local cur = UnitHealth(unit)
+    local max = UnitHealthMax(unit)
 
     frame.HealthValue:SetText(FormatHealthText(format, cur, max))
 end
