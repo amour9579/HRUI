@@ -1,45 +1,76 @@
 local _, ns = ...
 
-local SHORT_ABBREV_CONFIG
-local HEALTH_ABBREV_CONFIG
-local HEALTH_INTEGER_ABBREV_CONFIG
+local SHORT_ABBREV_OPTIONS
+local HEALTH_AUTO_ABBREV_OPTIONS
+local HEALTH_ONE_DECIMAL_ABBREV_OPTIONS
+local HEALTH_ZERO_DECIMAL_ABBREV_OPTIONS
 
-local function CreateConfig(data)
+local function CreateAbbrevOptions(data)
+    local options = {
+        breakpointData = data,
+    }
+
     if CreateAbbreviateConfig then
-        return CreateAbbreviateConfig(data)
+        options.config = CreateAbbreviateConfig(data)
+        options.breakpointData = nil
     end
 
-    return data
+    return options
 end
 
-local function CreateShortConfig()
-    return CreateConfig({
+local function CreateAutoAbbrevOptions()
+    -- 기존 축약 방식: 단위값의 10 미만 구간만 소수 첫째 자리.
+    -- 65,000 -> 6.5만 / 100,000 -> 10만 / 416,000 -> 41만
+    return CreateAbbrevOptions({
         {
-            breakpoint = 10000,
-            abbreviation = "만",
-            significandDivisor = 10000,
-            fractionDivisor = 10,
-            abbreviationIsGlobal = false,
-        },
-        {
-            breakpoint = 100000000,
-            abbreviation = "억",
-            significandDivisor = 100000000,
-            fractionDivisor = 10,
+            breakpoint = 10000000000000,
+            abbreviation = "조",
+            significandDivisor = 1000000000000,
+            fractionDivisor = 1,
             abbreviationIsGlobal = false,
         },
         {
             breakpoint = 1000000000000,
             abbreviation = "조",
-            significandDivisor = 1000000000000,
+            significandDivisor = 100000000000,
+            fractionDivisor = 10,
+            abbreviationIsGlobal = false,
+        },
+        {
+            breakpoint = 1000000000,
+            abbreviation = "억",
+            significandDivisor = 100000000,
+            fractionDivisor = 1,
+            abbreviationIsGlobal = false,
+        },
+        {
+            breakpoint = 100000000,
+            abbreviation = "억",
+            significandDivisor = 10000000,
+            fractionDivisor = 10,
+            abbreviationIsGlobal = false,
+        },
+        {
+            breakpoint = 100000,
+            abbreviation = "만",
+            significandDivisor = 10000,
+            fractionDivisor = 1,
+            abbreviationIsGlobal = false,
+        },
+        {
+            breakpoint = 10000,
+            abbreviation = "만",
+            significandDivisor = 1000,
             fractionDivisor = 10,
             abbreviationIsGlobal = false,
         },
     })
 end
 
-local function CreateHealthConfig()
-    return CreateConfig({
+local function CreateOneDecimalAbbrevOptions()
+    -- 항상 소수 첫째 자리.
+    -- 65,000 -> 6.5만 / 100,000 -> 10.0만 / 416,000 -> 41.6만
+    return CreateAbbrevOptions({
         {
             breakpoint = 1000000000000,
             abbreviation = "조",
@@ -64,8 +95,10 @@ local function CreateHealthConfig()
     })
 end
 
-local function CreateHealthIntegerConfig()
-    return CreateConfig({
+local function CreateZeroDecimalAbbrevOptions()
+    -- 소수점 표시 안 함.
+    -- 65,000 -> 6만 / 100,000 -> 10만 / 416,000 -> 41만
+    return CreateAbbrevOptions({
         {
             breakpoint = 1000000000000,
             abbreviation = "조",
@@ -91,42 +124,36 @@ local function CreateHealthIntegerConfig()
 end
 
 function ns:BuildAbbrevConfig()
-    if SHORT_ABBREV_CONFIG then
+    if SHORT_ABBREV_OPTIONS then
         return
     end
 
-    SHORT_ABBREV_CONFIG = CreateShortConfig()
+    SHORT_ABBREV_OPTIONS = CreateAutoAbbrevOptions()
 end
 
-function ns:BuildHealthAbbrevConfig()
-    if HEALTH_ABBREV_CONFIG then
+function ns:BuildHealthAbbrevConfigs()
+    if HEALTH_AUTO_ABBREV_OPTIONS then
         return
     end
 
-    HEALTH_ABBREV_CONFIG = CreateHealthConfig()
-end
-
-function ns:BuildHealthIntegerAbbrevConfig()
-    if HEALTH_INTEGER_ABBREV_CONFIG then
-        return
-    end
-
-    HEALTH_INTEGER_ABBREV_CONFIG = CreateHealthIntegerConfig()
+    HEALTH_AUTO_ABBREV_OPTIONS = CreateAutoAbbrevOptions()
+    HEALTH_ONE_DECIMAL_ABBREV_OPTIONS = CreateOneDecimalAbbrevOptions()
+    HEALTH_ZERO_DECIMAL_ABBREV_OPTIONS = CreateZeroDecimalAbbrevOptions()
 end
 
 function ns:GetHealthDecimalMode()
     local ufdb = ns.db and ns.db.profile and ns.db.profile.unitframes
     local appearance = ufdb and ufdb.appearance
-    local mode = appearance and appearance.healthDecimalMode or "one"
+    local mode = appearance and appearance.healthDecimalMode or "auto"
 
     if mode ~= "auto" and mode ~= "one" and mode ~= "zero" then
-        mode = "one"
+        mode = "auto"
     end
 
     return mode
 end
 
-local function FormatWithConfigInner(value, config)
+local function FormatWithOptionsInner(value, options)
     if value == nil then
         return ""
     end
@@ -135,8 +162,8 @@ local function FormatWithConfigInner(value, config)
         return value
     end
 
-    if config and AbbreviateNumbers then
-        return AbbreviateNumbers(value, config)
+    if options and AbbreviateNumbers then
+        return AbbreviateNumbers(value, options)
     end
 
     if BreakUpLargeNumbers then
@@ -146,8 +173,8 @@ local function FormatWithConfigInner(value, config)
     return tostring(value)
 end
 
-local function FormatWithConfig(value, config)
-    local ok, text = pcall(FormatWithConfigInner, value, config)
+local function FormatWithOptions(value, options)
+    local ok, text = pcall(FormatWithOptionsInner, value, options)
     if ok then
         return text
     end
@@ -155,123 +182,20 @@ local function FormatWithConfig(value, config)
     return ""
 end
 
-local function Truncate(value, decimals)
-    local factor = 10 ^ decimals
-    if value < 0 then
-        return math.ceil(value * factor) / factor
-    end
-
-    return math.floor(value * factor) / factor
-end
-
-local function GetHealthUnit(absValue)
-    if absValue >= 1000000000000 then
-        return 1000000000000, "조"
-    elseif absValue >= 100000000 then
-        return 100000000, "억"
-    elseif absValue >= 10000 then
-        return 10000, "만"
-    end
-end
-
-local function FormatHealthDirectInner(value, decimals)
-    local num = tonumber(value)
-    if not num then
-        return nil
-    end
-
-    local absValue = math.abs(num)
-    local divisor, suffix = GetHealthUnit(absValue)
-
-    if divisor then
-        local scaled = num / divisor
-
-        if decimals == 0 then
-            return string.format("%.0f%s", Truncate(scaled, 0), suffix)
-        end
-
-        return string.format("%." .. decimals .. "f%s", Truncate(scaled, decimals), suffix)
-    end
-
-    if BreakUpLargeNumbers then
-        return BreakUpLargeNumbers(num)
-    end
-
-    return string.format("%.0f", num)
-end
-
-local function FormatHealthDirect(value, decimals)
-    local ok, text = pcall(FormatHealthDirectInner, value, decimals)
-    if ok then
-        return text
-    end
-end
-
-local function FormatHealthAutoDirectInner(value)
-    local num = tonumber(value)
-    if not num then
-        return nil
-    end
-
-    local absValue = math.abs(num)
-    local divisor, suffix = GetHealthUnit(absValue)
-
-    if divisor then
-        local scaled = num / divisor
-        local absScaled = absValue / divisor
-
-        if absScaled < 10 then
-            return string.format("%.1f%s", Truncate(scaled, 1), suffix)
-        end
-
-        return string.format("%.0f%s", Truncate(scaled, 0), suffix)
-    end
-
-    if BreakUpLargeNumbers then
-        return BreakUpLargeNumbers(num)
-    end
-
-    return string.format("%.0f", num)
-end
-
-local function FormatHealthAutoDirect(value)
-    local ok, text = pcall(FormatHealthAutoDirectInner, value)
-    if ok then
-        return text
-    end
-end
-
 function ns:FormatShortValue(value)
     self:BuildAbbrevConfig()
-    return FormatWithConfig(value, SHORT_ABBREV_CONFIG)
+    return FormatWithOptions(value, SHORT_ABBREV_OPTIONS)
 end
 
 function ns:FormatHealth(value)
+    self:BuildHealthAbbrevConfigs()
+
     local mode = self:GetHealthDecimalMode()
-
-    if mode == "auto" then
-        local text = FormatHealthAutoDirect(value)
-        if text ~= nil then
-            return text
-        end
-        return self:FormatShortValue(value)
+    if mode == "one" then
+        return FormatWithOptions(value, HEALTH_ONE_DECIMAL_ABBREV_OPTIONS)
+    elseif mode == "zero" then
+        return FormatWithOptions(value, HEALTH_ZERO_DECIMAL_ABBREV_OPTIONS)
     end
 
-    if mode == "zero" then
-        local text = FormatHealthDirect(value, 0)
-        if text ~= nil then
-            return text
-        end
-
-        self:BuildHealthIntegerAbbrevConfig()
-        return FormatWithConfig(value, HEALTH_INTEGER_ABBREV_CONFIG)
-    end
-
-    local text = FormatHealthDirect(value, 1)
-    if text ~= nil then
-        return text
-    end
-
-    self:BuildHealthAbbrevConfig()
-    return FormatWithConfig(value, HEALTH_ABBREV_CONFIG)
+    return FormatWithOptions(value, HEALTH_AUTO_ABBREV_OPTIONS)
 end
