@@ -11,7 +11,6 @@ local function GetConfigUnit(frame)
 
     local unit = frame.unit
 
-    -- 차량 상태에서 이미 vehicle로 들어온 경우 설정은 player 것을 사용
     if unit == "vehicle" then
         unit = "player"
     end
@@ -37,6 +36,7 @@ local function GetActiveUnit(frame, configUnit)
 
     return nil
 end
+
 local function FormatHealthText(format, cur, max)
     local curText = ns:FormatHealth(cur)
 
@@ -50,6 +50,7 @@ local function FormatHealthText(format, cur, max)
         if curText == "" then
             return maxText
         end
+
         if maxText == "" then
             return curText
         end
@@ -78,25 +79,36 @@ function ns:UpdateHealthValue(frame, cur, max)
         return
     end
 
-    local unit = frame.HRUIConfigUnit or frame.unit
-    local db = ns.db and ns.db.profile and ns.db.profile.unitframes and ns.db.profile.unitframes[unit]
-    local cfg = db and db.healthText
+    local configUnit = GetConfigUnit(frame)
+    local activeUnit = GetActiveUnit(frame, configUnit)
 
+    local db = ns.db
+        and ns.db.profile
+        and ns.db.profile.unitframes
+        and ns.db.profile.unitframes[configUnit]
+
+    local cfg = db and db.healthText
     local format = cfg and cfg.format or "value"
+
     if format ~= "value" and format ~= "valueMax" then
         format = "value"
     end
 
-    cur = cur or frame.Health.__HRUICurrentHealth
-    max = max or frame.Health.__HRUIMaxHealth
+    if cur == nil and activeUnit then
+        cur = UnitHealth(activeUnit)
+    end
 
-    local text = FormatHealthText(format, cur, max)
-    frame.HealthValue:SetText(text)
+    if max == nil and activeUnit then
+        max = UnitHealthMax(activeUnit)
+    end
+
+    frame.HealthValue:SetText(FormatHealthText(format, cur, max))
 end
 
 function ns:CreateHealth(frame)
     local unit = frame.unit
     frame.HRUIConfigUnit = frame.HRUIConfigUnit or unit
+    
     local db = ns.db.profile.unitframes[unit]
     local powerCfg = db and db.power
     local powerEnabled = powerCfg and powerCfg.enabled
@@ -119,9 +131,6 @@ function ns:CreateHealth(frame)
 
     health.PostUpdate = function(bar, unit, cur, max)
         local owner = bar.__owner or frame
-        bar.__HRUICurrentHealth = cur
-        bar.__HRUIMaxHealth = max
-
         ns:UpdateHealthValue(owner, cur, max)
     end
 
