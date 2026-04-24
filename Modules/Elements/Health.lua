@@ -1,5 +1,42 @@
 local _, ns = ...
 
+local function GetConfigUnit(frame)
+    if not frame then
+        return nil
+    end
+
+    if frame.HRUIConfigUnit then
+        return frame.HRUIConfigUnit
+    end
+
+    local unit = frame.unit
+
+    -- 차량 상태에서 이미 vehicle로 들어온 경우 설정은 player 것을 사용
+    if unit == "vehicle" then
+        unit = "player"
+    end
+
+    frame.HRUIConfigUnit = unit
+    return unit
+end
+
+local function GetActiveUnit(frame, configUnit)
+    if not frame then
+        return nil
+    end
+
+    local unit = frame.unit or configUnit
+
+    if unit and UnitExists(unit) then
+        return unit
+    end
+
+    if configUnit and UnitExists(configUnit) then
+        return configUnit
+    end
+
+    return nil
+end
 local function FormatHealthText(format, cur, max)
     local curText = ns:FormatHealth(cur)
 
@@ -42,27 +79,33 @@ function ns:UpdateHealthValue(frame)
         return
     end
 
-    local unit = frame.unit
-    local db = ns.db and ns.db.profile and ns.db.profile.unitframes and ns.db.profile.unitframes[unit]
+    local configUnit = GetConfigUnit(frame)
+    local activeUnit = GetActiveUnit(frame, configUnit)
+
+    local db = ns.db and ns.db.profile and ns.db.profile.unitframes and ns.db.profile.unitframes[configUnit]
     local cfg = db and db.healthText
+
     local format = cfg and cfg.format or "value"
     if format ~= "value" and format ~= "valueMax" then
         format = "value"
     end
 
-    if not unit or not UnitExists(unit) then
+    if not activeUnit then
         frame.HealthValue:SetText("")
         return
     end
 
-    local cur = UnitHealth(unit)
-    local max = UnitHealthMax(unit)
+    local cur = UnitHealth(activeUnit)
+    local max = UnitHealthMax(activeUnit)
 
     frame.HealthValue:SetText(FormatHealthText(format, cur, max))
 end
 
 function ns:CreateHealth(frame)
     local unit = frame.unit
+    -- 중요: oUF가 차량 상태에서 frame.unit을 vehicle로 바꿔도
+    -- 옵션 조회용 유닛은 최초 생성 시점의 unit으로 고정
+    frame.HRUIConfigUnit = frame.HRUIConfigUnit or unit
     local db = ns.db.profile.unitframes[unit]
     local powerCfg = db and db.power
     local powerEnabled = powerCfg and powerCfg.enabled
@@ -92,10 +135,11 @@ function ns:CreateHealth(frame)
 end
 
 function ns:CreateHealthValue(frame)
+    local configUnit = GetConfigUnit(frame)
     local parent = frame.Overlay or frame
 
     local value = parent:CreateFontString(nil, "OVERLAY")
-    value:SetFont(GetHealthFontPath(), GetHealthFontSize(frame.unit), "OUTLINE")
+    value:SetFont(GetHealthFontPath(), GetHealthFontSize(configUnit), "OUTLINE")
     value:SetTextColor(1, 1, 1)
 
     frame.HealthValue = value
@@ -109,14 +153,14 @@ function ns:UpdateHealthText(frame)
         return
     end
 
-    local unit = frame.unit
-    local db = ns.db.profile.unitframes[unit]
+    local configUnit = GetConfigUnit(frame)
+    local db = ns.db.profile.unitframes[configUnit]
     local cfg = db and db.healthText
     if not cfg then
         return
     end
 
-    frame.HealthValue:SetFont(GetHealthFontPath(), GetHealthFontSize(unit), "OUTLINE")
+    frame.HealthValue:SetFont(GetHealthFontPath(), GetHealthFontSize(configUnit), "OUTLINE")
 
     if cfg.enabled then
         frame.HealthValue:Show()
