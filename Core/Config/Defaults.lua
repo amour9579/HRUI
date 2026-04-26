@@ -179,6 +179,11 @@ ns.Defaults = {
 
         mythicPlusReporter = {
             enabled = true,
+            reportFields = {
+                showSpec = true,
+                showItemLevel = true,
+                showScore = true,
+            },
         },
 
         dice = {
