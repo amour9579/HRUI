@@ -13,6 +13,30 @@ M.suppressNextOwnCommand = nil
 local strfind = string.find
 local format = string.format
 local sort = table.sort
+local tinsert = table.insert
+
+local function GetReportFields()
+    if not ns.db or not ns.db.profile then
+        return nil
+    end
+
+    local db = ns.db.profile
+    local reporter = db.mythicPlusReporter
+    if not reporter then
+        return nil
+    end
+
+    return reporter.reportFields
+end
+
+local function IsReportFieldEnabled(key)
+    local reportFields = GetReportFields()
+    if not reportFields then
+        return true
+    end
+
+    return reportFields[key] ~= false
+end
 
 local KEYSTONE_ITEM_IDS = {
     [138019] = true,
@@ -272,20 +296,38 @@ end
 
 function M:BuildReportMessage(reportType, isEnglish)
     if reportType == "돌" then
-        local specName = GetCurrentSpecName(isEnglish)
-        local ilvlText = GetCurrentEquippedItemLevelText()
         local keystone = self:GetMyKeystone()
-        local rioScore = GetCurrentDungeonScore()
+        local infoParts = {}
 
         if isEnglish and keystone == "쐐기돌 없음" then
             keystone = "No Keystone"
         end
 
-        if isEnglish then
-            return format("[%s] iLvl:%s (Score:%d) >> %s", specName, ilvlText, rioScore, keystone)
+        if IsReportFieldEnabled("showSpec") then
+            tinsert(infoParts, format("[%s]", GetCurrentSpecName(isEnglish)))
         end
 
-        return format("[%s] 템렙:%s (점수:%d) >> %s", specName, ilvlText, rioScore, keystone)
+        if IsReportFieldEnabled("showItemLevel") then
+            if isEnglish then
+                tinsert(infoParts, format("iLvl:%s", GetCurrentEquippedItemLevelText()))
+            else
+                tinsert(infoParts, format("템렙:%s", GetCurrentEquippedItemLevelText()))
+            end
+        end
+
+        if IsReportFieldEnabled("showScore") then
+            if isEnglish then
+                tinsert(infoParts, format("(Score:%d)", GetCurrentDungeonScore()))
+            else
+                tinsert(infoParts, format("(점수:%d)", GetCurrentDungeonScore()))
+            end
+        end
+
+        if #infoParts > 0 then
+            return format("%s >> %s", table.concat(infoParts, " "), keystone)
+        end
+
+        return tostring(keystone)
     elseif reportType == "주차" then
         return self:GetWeeklyDungeonInfo(isEnglish)
     end
