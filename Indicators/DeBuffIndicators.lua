@@ -212,22 +212,75 @@ local function CreatePreviewDebuffButton(parent, size)
     return button
 end
 
+local function GetLayoutValues(db, buttonCount)
+    local anchor = anchorValues[db.anchor] and db.anchor or "TOPLEFT"
+    local iconSize = math.max(10, db.size or DEFAULT_ICON_SIZE)
+    local spacing = db.spacing or DEFAULT_SPACING
+    local maxIcons = math.max(1, db.maxIcons or DEFAULT_MAX_ICONS)
+
+    if buttonCount then
+        maxIcons = math.min(maxIcons, buttonCount)
+    end
+
+    local growth = db.growth == "LEFT" and "LEFT" or "RIGHT"
+    local x = db.x or 0
+    local y = db.y or 0
+
+    return anchor, iconSize, spacing, maxIcons, growth, x, y
+end
+
+local function MakeLayoutKey(anchor, iconSize, spacing, maxIcons, growth, x, y)
+    return table.concat({ anchor, iconSize, spacing, maxIcons, growth, x, y }, ":")
+end
+
+local function ResetDebuffButton(button)
+    if not button then
+        return
+    end
+
+    button.unit = nil
+    button.auraIndex = nil
+    button.auraFilter = nil
+    button.auraInstanceID = nil
+
+    if button.count then
+        button.count:SetText("")
+    end
+
+    if button.icon then
+        button.icon:SetTexture(nil)
+    end
+
+    if button.cooldown then
+        button.cooldown:Hide()
+    end
+end
+
+local function MakePreviewDataKey(db, maxIcons)
+    return table.concat({
+        maxIcons or 0,
+        db and db.cooldownText == true and "cooldownText:1" or "cooldownText:0",
+    }, ":")
+end
+
 local function ApplyDebuffLayout(frame, db)
     local debuffs = frame.DeBuffIndicators
     if not debuffs or not debuffs.buttons then
         return
     end
 
-    local anchor = anchorValues[db.anchor] and db.anchor or "TOPLEFT"
-    local point = anchor
+    local anchor, iconSize, spacing, maxIcons, growth, x, y = GetLayoutValues(db)
+    local layoutKey = MakeLayoutKey(anchor, iconSize, spacing, maxIcons, growth, x, y)
 
+    if debuffs.__layoutKey == layoutKey then
+        return
+    end
+
+    debuffs.__layoutKey = layoutKey
     debuffs:ClearAllPoints()
-    debuffs:SetPoint(point, frame, point, db.x or 0, db.y or 0)
+    debuffs:SetPoint(anchor, frame, anchor, x, y)
 
-    local iconSize = math.max(10, db.size or DEFAULT_ICON_SIZE)
-    local spacing = db.spacing or DEFAULT_SPACING
-    local maxIcons = math.max(1, db.maxIcons or DEFAULT_MAX_ICONS)
-    local growLeft = db.growth == "LEFT"
+    local growLeft = growth == "LEFT"
 
     for i = 1, #debuffs.buttons do
         local button = debuffs.buttons[i]
@@ -240,14 +293,14 @@ local function ApplyDebuffLayout(frame, db)
         button.__baseX = xOffset
         button.__baseY = 0
         button:SetPoint(anchor, debuffs, anchor, xOffset, 0)
-        button:SetShown(i <= maxIcons)
 
         if i > maxIcons then
+            ResetDebuffButton(button)
             button:Hide()
         end
     end
 
-    debuffs:SetSize((iconSize * maxIcons) + (spacing * (maxIcons - 1)), iconSize)
+    debuffs:SetSize((iconSize * maxIcons) + (spacing * math.max(maxIcons - 1, 0)), iconSize)
 end
 
 local function ApplyDebuffLayoutToHolder(relativeFrame, holder, db)
@@ -255,15 +308,19 @@ local function ApplyDebuffLayoutToHolder(relativeFrame, holder, db)
         return
     end
 
-    local anchor = anchorValues[db.anchor] and db.anchor or "TOPLEFT"
-    local iconSize = math.max(10, db.size or DEFAULT_ICON_SIZE)
-    local spacing = db.spacing or DEFAULT_SPACING
-    local maxIcons = math.max(1, math.min(db.maxIcons or DEFAULT_MAX_ICONS, #holder.buttons))
-    local growLeft = db.growth == "LEFT"
+    local anchor, iconSize, spacing, maxIcons, growth, x, y = GetLayoutValues(db, #holder.buttons)
+    local layoutKey = MakeLayoutKey(anchor, iconSize, spacing, maxIcons, growth, x, y)
 
+    if holder.__layoutKey == layoutKey then
+        return
+    end
+
+    holder.__layoutKey = layoutKey
     holder:ClearAllPoints()
-    holder:SetPoint(anchor, relativeFrame, anchor, db.x or 0, db.y or 0)
+    holder:SetPoint(anchor, relativeFrame, anchor, x, y)
     holder:SetSize((iconSize * maxIcons) + (spacing * math.max(maxIcons - 1, 0)), iconSize)
+
+    local growLeft = growth == "LEFT"
 
     for i, button in ipairs(holder.buttons) do
         button:ClearAllPoints()
@@ -277,6 +334,7 @@ local function ApplyDebuffLayoutToHolder(relativeFrame, holder, db)
         button:SetPoint(anchor, holder, anchor, xOffset, 0)
 
         if i > maxIcons then
+            ResetDebuffButton(button)
             button:Hide()
         end
     end
@@ -491,13 +549,17 @@ local function FillPreviewDebuffs(holder, db)
     end
 
     local maxIcons = math.max(1, math.min(db.maxIcons or DEFAULT_MAX_ICONS, #holder.buttons))
+    local previewKey = MakePreviewDataKey(db, maxIcons)
+
+    if holder.__previewDataKey == previewKey then
+        return
+    end
+
+    holder.__previewDataKey = previewKey
 
     for i, button in ipairs(holder.buttons) do
         if i <= maxIcons then
-            button.unit = nil
-            button.auraIndex = nil
-            button.auraFilter = nil
-            button.auraInstanceID = nil
+            ResetDebuffButton(button)
             button.icon:SetTexture(PREVIEW_TEXTURES[((i - 1) % #PREVIEW_TEXTURES) + 1])
             button.count:SetText((i == 2 or i == 5 or i == 8) and "2" or "")
             if button.cooldown then
@@ -512,6 +574,7 @@ local function FillPreviewDebuffs(holder, db)
             ApplyDebuffBorder(button, PREVIEW_DEBUFF_TYPES[((i - 1) % #PREVIEW_DEBUFF_TYPES) + 1])
             button:Show()
         else
+            ResetDebuffButton(button)
             button:Hide()
         end
     end
@@ -541,7 +604,19 @@ end
 
 local function HideMoverPreviewHolder(mover)
     if mover and mover.DeBuffPreviewIndicators then
-        mover.DeBuffPreviewIndicators:Hide()
+        local holder = mover.DeBuffPreviewIndicators
+
+        if holder.buttons then
+            for _, button in ipairs(holder.buttons) do
+                ResetDebuffButton(button)
+                button:Hide()
+            end
+        end
+
+        holder.__layoutKey = nil
+        holder.__previewDataKey = nil
+        holder:Hide()
+        mover.DeBuffPreviewIndicators = nil
     end
 end
 
@@ -638,7 +713,7 @@ function ns:UpdateDeBuffIndicators(frame)
     for i = 1, #frame.DeBuffIndicators.buttons do
         local button = frame.DeBuffIndicators.buttons[i]
         if i > maxIcons then
-            button:SetScale(1)
+            ResetDebuffButton(button)
             button:Hide()
         else
             local aura = GetDebuffData(frame.unit, i, auraFilter)
@@ -651,25 +726,10 @@ function ns:UpdateDeBuffIndicators(frame)
                 button.count:SetText(GetDebuffApplicationText(frame.unit, aura))
                 ApplyDebuffCooldownTextSetting(button, db)
                 ApplyDebuffBorder(button, aura.debuffType)
-                button:SetScale(1)
-                button:ClearAllPoints()
-                button:SetPoint(
-                    button.__baseAnchor or db.anchor or "TOPLEFT",
-                    frame.DeBuffIndicators,
-                    button.__baseAnchor or db.anchor or "TOPLEFT",
-                    button.__baseX or 0,
-                    button.__baseY or 0
-                )
-
                 ApplyDebuffCooldown(button, frame.unit, aura)
-
                 button:Show()
             else
-                button.unit = nil
-                button.auraIndex = nil
-                button.auraFilter = nil
-                button.auraInstanceID = nil
-                button:SetScale(1)
+                ResetDebuffButton(button)
                 button:Hide()
             end
         end
@@ -693,7 +753,16 @@ function ns:CreateDeBuffIndicators(frame)
     frame.DeBuffIndicators = holder
 
     local eventFrame = CreateFrame("Frame", nil, frame)
-    eventFrame:RegisterUnitEvent("UNIT_AURA", frame.unit)
+    local registeredUnitAura = false
+
+    if frame.unit and eventFrame.RegisterUnitEvent then
+        registeredUnitAura = pcall(eventFrame.RegisterUnitEvent, eventFrame, "UNIT_AURA", frame.unit)
+    end
+
+    if not registeredUnitAura then
+        eventFrame:RegisterEvent("UNIT_AURA")
+    end
+
     eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
 
     if frame.unit == "target" then
@@ -708,6 +777,7 @@ function ns:CreateDeBuffIndicators(frame)
         if event == "UNIT_AURA" and unit ~= frame.unit then
             return
         end
+
         ns:UpdateDeBuffIndicators(frame)
     end)
 
