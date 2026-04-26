@@ -4,6 +4,61 @@ ns.Movers = ns.Movers or {}
 
 local movers = {}
 local gridLines = {}
+local pendingFramePositionRefresh = {}
+local combatEventFrame
+
+local function IsCombatLockedProtectedFrame(frame)
+    if not frame or not InCombatLockdown or not InCombatLockdown() then
+        return false
+    end
+
+    if frame.IsProtected then
+        local ok, isProtected = pcall(frame.IsProtected, frame)
+        if ok and isProtected then
+            return true
+        end
+    end
+
+    return false
+end
+
+local function EnsureCombatEventFrame()
+    if combatEventFrame then
+        return combatEventFrame
+    end
+
+    combatEventFrame = CreateFrame("Frame")
+    combatEventFrame:SetScript("OnEvent", function(self, event)
+        if event ~= "PLAYER_REGEN_ENABLED" then
+            return
+        end
+
+        self:UnregisterEvent("PLAYER_REGEN_ENABLED")
+
+        local queued = {}
+        for key in pairs(pendingFramePositionRefresh) do
+            queued[#queued + 1] = key
+            pendingFramePositionRefresh[key] = nil
+        end
+
+        for _, key in ipairs(queued) do
+            if ns.Movers and ns.Movers.RefreshMover then
+                ns.Movers:RefreshMover(key)
+            end
+        end
+    end)
+
+    return combatEventFrame
+end
+
+local function QueueFramePositionRefresh(key)
+    if not key then
+        return
+    end
+
+    pendingFramePositionRefresh[key] = true
+    EnsureCombatEventFrame():RegisterEvent("PLAYER_REGEN_ENABLED")
+end
 
 local moverOrder = {
     "player",
@@ -136,17 +191,28 @@ local function UpdateMoverCoordText(mover)
     mover.coordText:SetText(string.format("X:%d  Y:%d", db.x or 0, db.y or 0))
 end
 
-local function ApplyFramePosition(frame, db)
+local function ApplyFramePosition(frame, db, key)
     if not frame or not db then
-        return
+        return false
     end
 
     local x, y = ClampToScreenByCenter(frame, db.x or 0, db.y or 0)
     db.x = RoundToPixel(x)
     db.y = RoundToPixel(y)
 
+    -- oUF unit frames are protected in combat. Re-anchoring them while the
+    -- player is in combat can trigger ADDON_ACTION_BLOCKED from
+    -- ClearAllPoints/SetPoint, especially when changing config values from
+    -- AceConfig. Keep the mover/preview responsive, but defer the actual
+    -- protected frame position update until combat ends.
+    if IsCombatLockedProtectedFrame(frame) then
+        QueueFramePositionRefresh(key)
+        return false
+    end
+
     frame:ClearAllPoints()
     frame:SetPoint("CENTER", UIParent, "CENTER", db.x, db.y)
+    return true
 end
 
 local function ApplyMoverSize(mover, key, attachedFrame, db)
@@ -292,8 +358,8 @@ local function UpdateMoverDrag(mover)
     db.x = newX
     db.y = newY
 
-    ApplyFramePosition(mover, db)
-    ApplyFramePosition(mover.attachedFrame, db)
+    ApplyFramePosition(mover, db, mover.key)
+    ApplyFramePosition(mover.attachedFrame, db, mover.key)
 
     UpdateMoverCoordText(mover)
 
@@ -336,8 +402,8 @@ local function OnMoverMouseUp(self)
     db.x = RoundToPixel(db.x or 0)
     db.y = RoundToPixel(db.y or 0)
 
-    ApplyFramePosition(self, db)
-    ApplyFramePosition(self.attachedFrame, db)
+    ApplyFramePosition(self, db, self.key)
+    ApplyFramePosition(self.attachedFrame, db, self.key)
 
     UpdateMoverCoordText(self)
 
@@ -392,6 +458,10 @@ local function CreateMover(key, attachedFrame, label)
     return mover
 end
 
+function ns.Movers:GetMover(key)
+    return movers[key]
+end
+
 function ns.Movers:EnsureMover(key)
     if movers[key] then
         return movers[key]
@@ -406,7 +476,7 @@ function ns.Movers:EnsureMover(key)
 
     local mover = CreateMover(key, frame, moverLabels[key] or key)
     ApplyMoverSize(mover, key, frame, db)
-    ApplyFramePosition(mover, db)
+    ApplyFramePosition(mover, db, mover.key)
     UpdateMoverCoordText(mover)
 
     return mover
@@ -420,7 +490,7 @@ function ns.Movers:CreateAll()
         if frame and db then
             local mover = CreateMover(key, frame, moverLabels[key] or key)
             ApplyMoverSize(mover, key, frame, db)
-            ApplyFramePosition(mover, db)
+            ApplyFramePosition(mover, db, mover.key)
             UpdateMoverCoordText(mover)
         end
     end
@@ -444,7 +514,7 @@ function ns.Movers:Unlock()
 
         if mover and db then
             ApplyMoverSize(mover, key, mover.attachedFrame, db)
-            ApplyFramePosition(mover, db)
+            ApplyFramePosition(mover, db, mover.key)
             UpdateMoverCoordText(mover)
 
             if db.enabled then
@@ -453,6 +523,12 @@ function ns.Movers:Unlock()
                 mover:Hide()
             end
         end
+    end
+
+    if ns.RefreshDeBuffIndicatorPreviewFrames then
+        ns:RefreshDeBuffIndicatorPreviewFrames()
+    elseif ns.UpdateMoveModeDeBuffPreviews then
+        ns:UpdateMoveModeDeBuffPreviews()
     end
 end
 
@@ -464,10 +540,18 @@ function ns.Movers:Lock()
         ns:HideBossPreviewFrames()
     end
 
+    if ns.HideMoveModeDeBuffPreviews then
+        ns:HideMoveModeDeBuffPreviews()
+    end
+
     for _, mover in pairs(movers) do
         mover:Hide()
         mover:SetScript("OnUpdate", nil)
         mover.isDragging = nil
+    end
+
+    if ns.RefreshDeBuffIndicatorPreviewFrames then
+        ns:RefreshDeBuffIndicatorPreviewFrames()
     end
 end
 
@@ -486,8 +570,8 @@ function ns.Movers:RefreshMover(key)
 
     ApplyMoverSize(mover, key, attachedFrame, db)
 
-    ApplyFramePosition(mover, db)
-    ApplyFramePosition(attachedFrame, db)
+    ApplyFramePosition(mover, db, mover.key)
+    ApplyFramePosition(attachedFrame, db, key)
 
     UpdateMoverCoordText(mover)
 
@@ -497,6 +581,8 @@ function ns.Movers:RefreshMover(key)
         elseif ns.HideBossPreviewFrames then
             ns:HideBossPreviewFrames()
         end
+    elseif self.unlocked and ns.UpdateMoveModeDeBuffPreviews then
+        ns:UpdateMoveModeDeBuffPreviews(key)
     end
 
     if db.enabled and self.unlocked then
