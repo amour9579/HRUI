@@ -24,6 +24,9 @@ function ns.UnitFrameStyle(self, unit)
     if ns.CreateBuffIndicators then
         ns:CreateBuffIndicators(self)
     end
+    if ns.CreateDeBuffIndicators then
+        ns:CreateDeBuffIndicators(self)
+    end
 
     self.Health.colorClass = true
     self.Health.colorReaction = true
@@ -85,6 +88,9 @@ function ns:RefreshFrameElements(frame)
     end
     if ns.UpdateBuffIndicators then
         ns:UpdateBuffIndicators(frame)
+    end
+    if ns.UpdateDeBuffIndicators then
+        ns:UpdateDeBuffIndicators(frame)
     end
 
     ForceUpdateTag(frame.Name)

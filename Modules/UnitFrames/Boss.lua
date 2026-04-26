@@ -25,6 +25,7 @@ local function GetBossDB()
         healthText = { enabled = true, anchor = "RIGHT", x = -8, y = 0, format = "value", fontSize = 11, },
         powerText = { enabled = false, anchor = "CENTER", x = 0, y = 0, format = "value", fontSize = 10, },
         buffs = { enabled = false, size = 18, spacing = 2, maxIcons = 8, anchor = "TOPRIGHT", x = 0, y = 4, growth = "LEFT", },
+        debuffs = { enabled = false, size = 18, spacing = 2, maxIcons = 8, anchor = "TOPLEFT", x = 0, y = 4, growth = "RIGHT", },
     }
 
     local db = ufdb.boss
@@ -39,6 +40,7 @@ local function GetBossDB()
     db.healthText = db.healthText or { enabled = true, anchor = "RIGHT", x = -8, y = 0, format = "value", fontSize = 11, }
     db.powerText = db.powerText or { enabled = false, anchor = "CENTER", x = 0, y = 0, format = "value", fontSize = 10, }
     db.buffs = db.buffs or { enabled = false, size = 18, spacing = 2, maxIcons = 8, anchor = "TOPRIGHT", x = 0, y = 4, growth = "LEFT", }
+    db.debuffs = db.debuffs or { enabled = false, size = 18, spacing = 2, maxIcons = 8, anchor = "TOPLEFT", x = 0, y = 4, growth = "RIGHT", }
 
     for i = 1, GetMaxBossFrames() do
         ufdb["boss" .. i] = db
@@ -160,42 +162,50 @@ local function CreatePreviewBuffButton(parent)
     return button
 end
 
-local function ApplyPreviewBuffs(frame, db)
-    if not frame or not frame.Buffs then
+local function ApplyPreviewAuras(frame, holder, cfg, defaultAnchor, defaultGrowth)
+    if not frame or not holder then
         return
     end
 
-    local cfg = db and db.buffs
     if not cfg or cfg.enabled == false then
-        frame.Buffs:Hide()
+        holder:Hide()
         return
     end
 
-    local anchor = cfg.anchor or "TOPRIGHT"
+    local anchor = cfg.anchor or defaultAnchor or "TOPRIGHT"
     local size = math.max(10, cfg.size or 18)
     local spacing = cfg.spacing or 2
-    local maxIcons = math.max(1, math.min(cfg.maxIcons or 8, #frame.Buffs.buttons))
-    local growLeft = cfg.growth ~= "RIGHT"
+    local maxIcons = math.max(1, math.min(cfg.maxIcons or 8, #holder.buttons))
+    local growth = cfg.growth or defaultGrowth or "LEFT"
+    local growLeft = growth == "LEFT"
 
-    frame.Buffs:ClearAllPoints()
-    frame.Buffs:SetPoint(anchor, frame, anchor, cfg.x or 0, cfg.y or 0)
-    frame.Buffs:SetSize((size * maxIcons) + (spacing * math.max(maxIcons - 1, 0)), size)
+    holder:ClearAllPoints()
+    holder:SetPoint(anchor, frame, anchor, cfg.x or 0, cfg.y or 0)
+    holder:SetSize((size * maxIcons) + (spacing * math.max(maxIcons - 1, 0)), size)
 
-    for i, button in ipairs(frame.Buffs.buttons) do
+    for i, button in ipairs(holder.buttons) do
         button:ClearAllPoints()
         button:SetSize(size, size)
 
         if i <= maxIcons then
             local offset = (i - 1) * (size + spacing)
             local x = growLeft and -offset or offset
-            button:SetPoint(anchor, frame.Buffs, anchor, x, 0)
+            button:SetPoint(anchor, holder, anchor, x, 0)
             button:Show()
         else
             button:Hide()
         end
     end
 
-    frame.Buffs:Show()
+    holder:Show()
+end
+
+local function ApplyPreviewBuffs(frame, db)
+    ApplyPreviewAuras(frame, frame and frame.Buffs, db and db.buffs, "TOPRIGHT", "LEFT")
+end
+
+local function ApplyPreviewDebuffs(frame, db)
+    ApplyPreviewAuras(frame, frame and frame.Debuffs, db and db.debuffs, "TOPLEFT", "RIGHT")
 end
 
 local function CreateBossPreviewFrame(parent, index)
@@ -265,6 +275,15 @@ local function CreateBossPreviewFrame(parent, index)
         buffs.buttons[i] = CreatePreviewBuffButton(buffs)
     end
     frame.Buffs = buffs
+
+    local debuffs = CreateFrame("Frame", nil, overlay)
+    debuffs:SetFrameLevel(overlay:GetFrameLevel() + 2)
+    debuffs.buttons = {}
+    for i = 1, 20 do
+        debuffs.buttons[i] = CreatePreviewBuffButton(debuffs)
+        debuffs.buttons[i]:SetBackdropBorderColor(1, 0, 0, 1)
+    end
+    frame.Debuffs = debuffs
 
     frame:Hide()
     return frame
@@ -392,6 +411,7 @@ function ns:RefreshBossPreviewFrames()
         end
 
         ApplyPreviewBuffs(frame, db)
+        ApplyPreviewDebuffs(frame, db)
 
         if ns.BossPreviewActive and db.enabled ~= false then
             frame:Show()

@@ -42,6 +42,7 @@ Modules\Elements\Castbar.lua
 Modules\ActionBars\ActionBars.lua
 Modules\Elements\PlayerIcons.lua
 Indicators\BuffIndicators.lua
+Indicators\DeBuffIndicators.lua
 
 Modules\UnitFrames\Shared.lua
 Modules\UnitFrames\Style.lua

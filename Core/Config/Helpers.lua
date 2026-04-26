@@ -60,7 +60,8 @@ end
 
 function ns:SetNestedUnitValue(unit, group, key, value)
     local db = ns:GetUnitDB(unit)
-    if not db or not db[group] then return end
+    if not db then return end
+    db[group] = db[group] or {}
     db[group][key] = value
     ns:RefreshUnit(unit)
 end
