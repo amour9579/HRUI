@@ -19,6 +19,10 @@ local buffGrowthValues = {
     LEFT = "왼쪽",
     RIGHT = "오른쪽",
 }
+local debuffFilterModeValues = {
+    mine = "내가 건 디버프",
+    all = "모든 디버프",
+}
 
 local function AddArgs(target, source)
     for key, value in pairs(source) do
@@ -105,7 +109,7 @@ local function CreatePlayerIconArgs()
         iconsEnabled = {
             type = "toggle",
             name = "상태 아이콘 사용",
-            order = 51,
+            order = 61,
             get = function() return ns.db.profile.unitframes.player.icons.enabled end,
             set = function(_, value)
                 ns.db.profile.unitframes.player.icons.enabled = value
@@ -115,10 +119,10 @@ local function CreatePlayerIconArgs()
             end,
         },
 
-        restIcon = CreateIconGroup(52, "휴식", "rest"),
-        combatIcon = CreateIconGroup(53, "전투", "combat"),
-        leaderIcon = CreateIconGroup(54, "파티장", "leader"),
-        assistantIcon = CreateIconGroup(55, "어시스트", "assistant"),
+        restIcon = CreateIconGroup(62, "휴식", "rest"),
+        combatIcon = CreateIconGroup(63, "전투", "combat"),
+        leaderIcon = CreateIconGroup(64, "파티장", "leader"),
+        assistantIcon = CreateIconGroup(65, "어시스트", "assistant"),
     }
 end
 
@@ -424,19 +428,41 @@ local function CreateUnitGroup(unit, label)
             get = function() return ns:GetNestedUnitValue(unit, "buffs", "y") or 0 end,
             set = function(_, value) ns:SetNestedUnitValue(unit, "buffs", "y", value) end,
         },
+        break5 = {
+            type = "description",
+            name = "\n",
+            width = "full",
+            order = 49.1,
+        },
 
         debuffsHeader = { type = "header", name = "디버프", order = 60 },
         debuffsEnabled = {
             type = "toggle",
             name = "디버프 표시",
-            order = 61,
+            order = 51,
             get = function() return ns:GetNestedUnitValue(unit, "debuffs", "enabled") end,
             set = function(_, value) ns:SetNestedUnitValue(unit, "debuffs", "enabled", value) end,
+        },
+        debuffsCooldownText = {
+            type = "toggle",
+            name = "쿨다운 숫자 표시",
+            desc = "디버프 아이콘의 쿨다운 숫자를 표시합니다. Blizzard 쿨다운 숫자 또는 OmniCC 같은 쿨다운 애드온 표시를 허용합니다.",
+            order = 52,
+            get = function() return ns:GetNestedUnitValue(unit, "debuffs", "cooldownText") == true end,
+            set = function(_, value) ns:SetNestedUnitValue(unit, "debuffs", "cooldownText", value == true) end,
+        },
+        debuffsFilterMode = {
+            type = "select",
+            name = "디버프 보기",
+            order = 53,
+            values = debuffFilterModeValues,
+            get = function() return ns:GetNestedUnitValue(unit, "debuffs", "filterMode") or "all" end,
+            set = function(_, value) ns:SetNestedUnitValue(unit, "debuffs", "filterMode", value) end,
         },
         debuffsSize = {
             type = "range",
             name = "아이콘 크기",
-            order = 63,
+            order = 54,
             min = 10,
             max = 48,
             step = 1,
@@ -446,7 +472,7 @@ local function CreateUnitGroup(unit, label)
         debuffsMax = {
             type = "range",
             name = "최대 아이콘 수",
-            order = 64,
+            order = 55,
             min = 1,
             max = 20,
             step = 1,
@@ -456,7 +482,7 @@ local function CreateUnitGroup(unit, label)
         debuffsSpacing = {
             type = "range",
             name = "아이콘 간격",
-            order = 65,
+            order = 56,
             min = 0,
             max = 12,
             step = 1,
@@ -466,7 +492,7 @@ local function CreateUnitGroup(unit, label)
         debuffsAnchor = {
             type = "select",
             name = "기준점",
-            order = 66,
+            order = 57,
             values = buffAnchorValues,
             get = function() return ns:GetNestedUnitValue(unit, "debuffs", "anchor") or "TOPLEFT" end,
             set = function(_, value) ns:SetNestedUnitValue(unit, "debuffs", "anchor", value) end,
@@ -474,15 +500,21 @@ local function CreateUnitGroup(unit, label)
         debuffsGrowth = {
             type = "select",
             name = "증가 방향",
-            order = 67,
+            order = 58,
             values = buffGrowthValues,
             get = function() return ns:GetNestedUnitValue(unit, "debuffs", "growth") or "RIGHT" end,
             set = function(_, value) ns:SetNestedUnitValue(unit, "debuffs", "growth", value) end,
         },
+        break6 = {
+            type = "description",
+            name = "\n",
+            width = "full",
+            order = 58.1,
+        },
         debuffsX = {
             type = "range",
             name = "디버프 X",
-            order = 68,
+            order = 59,
             min = -200,
             max = 200,
             step = 1,
@@ -492,7 +524,7 @@ local function CreateUnitGroup(unit, label)
         debuffsY = {
             type = "range",
             name = "디버프 Y",
-            order = 69,
+            order = 59.5,
             min = -200,
             max = 200,
             step = 1,
@@ -524,7 +556,7 @@ function ns:CreateUnitFrameOptions()
         args = {
             appearance = ns:CreateUnitFrameAppearanceOptions(),
             player = { type = "group", name = "플레이어", order = 2, args = CreateUnitGroup("player", "플레이어").args },
-            target = { type = "group", name = "타겟", order = 3, args = CreateUnitGroup("target", "타겟").args },
+            target = { type = "group", name = "대상", order = 3, args = CreateUnitGroup("target", "대상").args },
             targettarget = { type = "group", name = "대상의 대상", order = 4, args = CreateUnitGroup("targettarget", "대상의 대상").args },
             focus = { type = "group", name = "주시", order = 5, args = CreateUnitGroup("focus", "주시").args },
             boss = { type = "group", name = "보스", order = 6, args = CreateUnitGroup("boss", "보스").args },
