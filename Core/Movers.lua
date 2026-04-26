@@ -11,6 +11,7 @@ local moverOrder = {
     "targettarget",
     "focus",
     "pet",
+    "boss",
     "castbar_player",
     "castbar_target",
     "castbar_pet",
@@ -23,6 +24,7 @@ local moverLabels = {
     targettarget = "TargetTarget",
     focus = "Focus",
     pet = "Pet",
+    boss = "Boss",
     castbar_player = "Player Castbar",
     castbar_target = "Target Castbar",
     castbar_pet = "Pet Castbar",
@@ -35,6 +37,7 @@ local frameRefs = {
     targettarget = "TargetTargetFrame",
     focus = "FocusFrame",
     pet = "PetFrame",
+    boss = "BossFrame",
     castbar_player = "PlayerCastbar",
     castbar_target = "TargetCastbar",
     castbar_pet = "PetCastbar",
@@ -144,6 +147,25 @@ local function ApplyFramePosition(frame, db)
 
     frame:ClearAllPoints()
     frame:SetPoint("CENTER", UIParent, "CENTER", db.x, db.y)
+end
+
+local function ApplyMoverSize(mover, key, attachedFrame, db)
+    if not mover then
+        return
+    end
+
+    local width = db and db.width or 100
+    local height = db and db.height or 20
+
+    if key == "boss" and ns.GetBossMoverSize then
+        width, height = ns:GetBossMoverSize()
+    elseif attachedFrame and attachedFrame.GetSize then
+        local frameWidth, frameHeight = attachedFrame:GetSize()
+        width = frameWidth and frameWidth > 0 and frameWidth or width
+        height = frameHeight and frameHeight > 0 and frameHeight or height
+    end
+
+    mover:SetSize(width or 100, height or 20)
 end
 
 local function ClearGrid()
@@ -383,7 +405,7 @@ function ns.Movers:EnsureMover(key)
     end
 
     local mover = CreateMover(key, frame, moverLabels[key] or key)
-    mover:SetSize(db.width or 100, db.height or 20)
+    ApplyMoverSize(mover, key, frame, db)
     ApplyFramePosition(mover, db)
     UpdateMoverCoordText(mover)
 
@@ -397,7 +419,7 @@ function ns.Movers:CreateAll()
 
         if frame and db then
             local mover = CreateMover(key, frame, moverLabels[key] or key)
-            mover:SetSize(db.width or 100, db.height or 20)
+            ApplyMoverSize(mover, key, frame, db)
             ApplyFramePosition(mover, db)
             UpdateMoverCoordText(mover)
         end
@@ -412,12 +434,16 @@ function ns.Movers:Unlock()
     self.unlocked = true
     self:ShowGrid()
 
+    if ns.ShowBossPreviewFrames then
+        ns:ShowBossPreviewFrames()
+    end
+
     for _, key in ipairs(moverOrder) do
         local mover = movers[key]
         local db = GetMoverDB(key)
 
         if mover and db then
-            mover:SetSize(db.width or 100, db.height or 20)
+            ApplyMoverSize(mover, key, mover.attachedFrame, db)
             ApplyFramePosition(mover, db)
             UpdateMoverCoordText(mover)
 
@@ -433,6 +459,10 @@ end
 function ns.Movers:Lock()
     self.unlocked = false
     self:HideGrid()
+
+    if ns.HideBossPreviewFrames then
+        ns:HideBossPreviewFrames()
+    end
 
     for _, mover in pairs(movers) do
         mover:Hide()
@@ -454,12 +484,20 @@ function ns.Movers:RefreshMover(key)
         return
     end
 
-    mover:SetSize(db.width or 100, db.height or 20)
+    ApplyMoverSize(mover, key, attachedFrame, db)
 
     ApplyFramePosition(mover, db)
     ApplyFramePosition(attachedFrame, db)
 
     UpdateMoverCoordText(mover)
+
+    if key == "boss" and self.unlocked then
+        if db.enabled and ns.ShowBossPreviewFrames then
+            ns:ShowBossPreviewFrames()
+        elseif ns.HideBossPreviewFrames then
+            ns:HideBossPreviewFrames()
+        end
+    end
 
     if db.enabled and self.unlocked then
         mover:Show()

@@ -10,6 +10,7 @@ local frameMap = {
     targettarget = "TargetTargetFrame",
     focus = "FocusFrame",
     pet = "PetFrame",
+    boss = "BossFrame",
 }
 
 local spawnOrder = {
@@ -18,6 +19,7 @@ local spawnOrder = {
     "targettarget",
     "focus",
     "pet",
+    "boss",
 }
 
 local function GetFrame(key)
@@ -53,6 +55,15 @@ local function ApplyFrameEnabled(key, frame, enabled)
     end
 
     frame.__HRUIAppliedEnabled = enabled
+    if key == "boss" then
+        if ns.SetBossFramesEnabled then
+            ns:SetBossFramesEnabled(enabled)
+        else
+            frame:SetShown(enabled)
+        end
+        return
+    end
+
     if key ~= "player" and UnregisterUnitWatch then
         UnregisterUnitWatch(frame)
     end
@@ -113,6 +124,9 @@ function ns.Modules.UnitFrames:Enable()
         ns:SpawnTargetTargetFrame(oUF)
         ns:SpawnFocusFrame(oUF)
         ns:SpawnPetFrame(oUF)
+        if ns.SpawnBossFrames then
+            ns:SpawnBossFrames(oUF)
+        end
 
         spawned = true
     end
@@ -131,13 +145,19 @@ end
 function ns.Modules.UnitFrames:RefreshUnit(key)
     ApplyFrameSettings(key)
 
-    local frame = GetFrame(key)
-    if frame and ns.RefreshFrameElements then
-        ns:RefreshFrameElements(frame)
-    end
+    if key == "boss" then
+        if ns.RefreshBossFrames then
+            ns:RefreshBossFrames()
+        end
+    else
+        local frame = GetFrame(key)
+        if frame and ns.RefreshFrameElements then
+            ns:RefreshFrameElements(frame)
+        end
 
-    if frame and ns.db.profile.unitframes[key] and not ns.db.profile.unitframes[key].enabled then
-        frame:Hide()
+        if frame and ns.db.profile.unitframes[key] and not ns.db.profile.unitframes[key].enabled then
+            frame:Hide()
+        end
     end
 
     if ns.Movers and ns.Movers.RefreshMover then

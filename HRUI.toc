@@ -2,7 +2,7 @@
 ## Title: HRUI
 ## Notes: HRUI
 ## Author: HR
-## Version: 0.1.5
+## Version: 0.1.6
 ## SavedVariables: HRUIDB
 ## SavedVariablesPerCharacter: HRUICharDB
 ## Dependencies: oUF
@@ -50,6 +50,7 @@ Modules\UnitFrames\Target.lua
 Modules\UnitFrames\TargetTarget.lua
 Modules\UnitFrames\Focus.lua
 Modules\UnitFrames\Pet.lua
+Modules\UnitFrames\Boss.lua
 Modules\UnitFrames\UnitFrames.lua
 
 Modules\Castbars\Player.lua

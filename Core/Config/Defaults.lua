@@ -264,6 +264,20 @@ ns.Defaults = {
                 buffs = { enabled = false, size = 16, spacing = 2, maxIcons = 6, anchor = "TOPRIGHT", x = 0, y = 4, growth = "LEFT", },
             },
 
+            boss = {
+                enabled = true,
+                width = 220,
+                height = 45,
+                x = 560,
+                y = 80,
+                spacing = 8,
+                power = { enabled = true, height = 6, },
+                name = { anchor = "LEFT", x = 8, y = 0, format = "levelName", fontSize = 12, },
+                healthText = { enabled = true, anchor = "RIGHT", x = -8, y = 0, format = "value", fontSize = 11, },
+                powerText = { enabled = false, anchor = "CENTER", x = 0, y = 0, format = "value", fontSize = 10, },
+                buffs = { enabled = false, size = 18, spacing = 2, maxIcons = 8, anchor = "TOPRIGHT", x = 0, y = 4, growth = "LEFT", },
+            },
+
             pet = {
                 enabled = true,
                 width = 180,

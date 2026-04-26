@@ -199,6 +199,18 @@ local function CreateUnitGroup(unit, label)
             set = function(_, value) ns:SetUnitValue(unit, "y", value) end,
         },
 
+        bossSpacing = {
+            type = "range",
+            name = "보스 프레임 간격",
+            order = 6,
+            min = 0,
+            max = 50,
+            step = 1,
+            hidden = function() return unit ~= "boss" end,
+            get = function() return ns:GetUnitValue(unit, "spacing") or 8 end,
+            set = function(_, value) ns:SetUnitValue(unit, "spacing", value) end,
+        },
+
         nameHeader = { type = "header", name = "이름", order = 10 },
         nameFormat = {
             type = "select",
@@ -440,7 +452,8 @@ function ns:CreateUnitFrameOptions()
             target = { type = "group", name = "타겟", order = 3, args = CreateUnitGroup("target", "타겟").args },
             targettarget = { type = "group", name = "대상의 대상", order = 4, args = CreateUnitGroup("targettarget", "대상의 대상").args },
             focus = { type = "group", name = "주시", order = 5, args = CreateUnitGroup("focus", "주시").args },
-            pet = { type = "group", name = "펫", order = 6, args = CreateUnitGroup("pet", "펫").args },
+            boss = { type = "group", name = "보스", order = 6, args = CreateUnitGroup("boss", "보스").args },
+            pet = { type = "group", name = "펫", order = 7, args = CreateUnitGroup("pet", "펫").args },
         },
     }
 end
