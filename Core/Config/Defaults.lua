@@ -216,7 +216,7 @@ ns.Defaults = {
                 healthText = { enabled = true, anchor = "RIGHT", x = -8, y = 0, format = "value", fontSize = 11, },
                 powerText = { enabled = false, anchor = "CENTER", x = 0, y = 0, format = "value", fontSize = 10, },
                 buffs = { enabled = false, size = 20, spacing = 2, maxIcons = 8, anchor = "TOPLEFT", x = 0, y = 6, growth = "RIGHT", },
-                debuffs = { enabled = false, size = 20, spacing = 2, maxIcons = 8, anchor = "TOPLEFT", x = 0, y = 28, growth = "RIGHT", },
+                debuffs = { enabled = false, filterMode = "mine", cooldownText = true, size = 20, spacing = 2, maxIcons = 8, anchor = "TOPLEFT", x = 0, y = 28, growth = "RIGHT", },
                 icons = {
                     enabled = true,
                     rest = { enabled = true, size = 20, anchor = "LEFT", x = 0, y = 25, },
@@ -237,7 +237,7 @@ ns.Defaults = {
                 healthText = { enabled = true, anchor = "RIGHT", x = -8, y = 0, format = "value", fontSize = 11, },
                 powerText = { enabled = false, anchor = "CENTER", x = 0, y = 0, format = "value", fontSize = 10, },
                 buffs = { enabled = false, size = 20, spacing = 2, maxIcons = 8, anchor = "TOPRIGHT", x = 0, y = 6, growth = "LEFT", },
-                debuffs = { enabled = false, size = 20, spacing = 2, maxIcons = 8, anchor = "TOPLEFT", x = 0, y = 6, growth = "RIGHT", },
+                debuffs = { enabled = false, filterMode = "mine", cooldownText = true, size = 20, spacing = 2, maxIcons = 8, anchor = "TOPLEFT", x = 0, y = 6, growth = "RIGHT", },
             },
 
             targettarget = {
@@ -251,7 +251,7 @@ ns.Defaults = {
                 healthText = { enabled = false, anchor = "RIGHT", x = -6, y = 0, format = "value", fontSize = 11, },
                 powerText = { enabled = false, anchor = "CENTER", x = 0, y = 0, format = "value", fontSize = 10, },
                 buffs = { enabled = false, size = 16, spacing = 2, maxIcons = 6, anchor = "TOP", x = 0, y = 4, growth = "RIGHT", },
-                debuffs = { enabled = false, size = 16, spacing = 2, maxIcons = 6, anchor = "TOP", x = 0, y = 22, growth = "RIGHT", },
+                debuffs = { enabled = false, filterMode = "mine", cooldownText = true, size = 16, spacing = 2, maxIcons = 6, anchor = "TOP", x = 0, y = 22, growth = "RIGHT", },
             },
 
             focus = {
@@ -265,7 +265,7 @@ ns.Defaults = {
                 healthText = { enabled = false, anchor = "RIGHT", x = -3, y = 0, format = "value", fontSize = 11, },
                 powerText = { enabled = false, anchor = "CENTER", x = 0, y = 0, format = "value", fontSize = 10, },
                 buffs = { enabled = false, size = 16, spacing = 2, maxIcons = 6, anchor = "TOPRIGHT", x = 0, y = 4, growth = "LEFT", },
-                debuffs = { enabled = false, size = 16, spacing = 2, maxIcons = 6, anchor = "TOPLEFT", x = 0, y = 4, growth = "RIGHT", },
+                debuffs = { enabled = false, filterMode = "mine", cooldownText = true, size = 16, spacing = 2, maxIcons = 6, anchor = "TOPLEFT", x = 0, y = 4, growth = "RIGHT", },
             },
 
             boss = {
@@ -280,7 +280,7 @@ ns.Defaults = {
                 healthText = { enabled = true, anchor = "RIGHT", x = -8, y = 0, format = "value", fontSize = 11, },
                 powerText = { enabled = false, anchor = "CENTER", x = 0, y = 0, format = "value", fontSize = 10, },
                 buffs = { enabled = false, size = 18, spacing = 2, maxIcons = 8, anchor = "TOPRIGHT", x = 0, y = 4, growth = "LEFT", },
-                debuffs = { enabled = false, size = 18, spacing = 2, maxIcons = 8, anchor = "TOPLEFT", x = 0, y = 4, growth = "RIGHT", },
+                debuffs = { enabled = false, filterMode = "mine", cooldownText = true, size = 18, spacing = 2, maxIcons = 8, anchor = "TOPLEFT", x = 0, y = 4, growth = "RIGHT", },
             },
 
             pet = {
@@ -294,7 +294,7 @@ ns.Defaults = {
                 healthText = { enabled = true, anchor = "RIGHT", x = -6, y = 0, format = "value", fontSize = 11, },
                 powerText = { enabled = false, anchor = "CENTER", x = 0, y = 0, format = "value", fontSize = 10, },
                 buffs = { enabled = false, size = 14, spacing = 2, maxIcons = 6, anchor = "TOPLEFT", x = 0, y = 4, growth = "RIGHT", },
-                debuffs = { enabled = false, size = 14, spacing = 2, maxIcons = 6, anchor = "TOPRIGHT", x = 0, y = 4, growth = "LEFT", },
+                debuffs = { enabled = false, filterMode = "mine", cooldownText = true, size = 14, spacing = 2, maxIcons = 6, anchor = "TOPRIGHT", x = 0, y = 4, growth = "LEFT", },
             },
         },
 
