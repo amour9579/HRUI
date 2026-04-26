@@ -7,6 +7,38 @@ local useLegacyUnitDebuff = type(UnitDebuff) == "function"
 local useUnitAura = type(UnitAura) == "function"
 local useCUnitAuras = C_UnitAuras and type(C_UnitAuras.GetAuraDataByIndex) == "function"
 
+local PREVIEW_UNITS = {
+    "player",
+    "target",
+    "targettarget",
+    "focus",
+    "pet",
+}
+
+local PREVIEW_TEXTURES = {
+    "Interface\\Icons\\Spell_Shadow_ShadowWordPain",
+    "Interface\\Icons\\Spell_Nature_CorrosiveBreath",
+    "Interface\\Icons\\Spell_Nature_AbolishMagic",
+    "Interface\\Icons\\Spell_Shadow_CurseOfSargeras",
+    "Interface\\Icons\\Ability_Creature_Disease_03",
+}
+
+local PREVIEW_DEBUFF_TYPES = {
+    "Magic",
+    "Poison",
+    "Curse",
+    "Disease",
+    "none",
+}
+
+local frameRefs = {
+    player = "PlayerFrame",
+    target = "TargetFrame",
+    targettarget = "TargetTargetFrame",
+    focus = "FocusFrame",
+    pet = "PetFrame",
+}
+
 local anchorValues = {
     TOPLEFT = "좌상",
     TOP = "상",
@@ -39,8 +71,59 @@ local function GetDebuffDB(unit)
     db.x = db.x or 0
     db.y = db.y or 4
     db.growth = db.growth or "RIGHT"
+    db.filterMode = db.filterMode or "all"
+    db.cooldownText = db.cooldownText == true
 
     return db
+end
+
+local function GetDebuffFilter(db)
+    local mode = db and db.filterMode or "all"
+
+    if mode == "mine" or mode == "player" then
+        return "HARMFUL|PLAYER"
+    end
+
+    return "HARMFUL"
+end
+
+local function IsBossUnit(unit)
+    return type(unit) == "string" and unit:match("^boss%d+$") ~= nil
+end
+
+local function IsMoveModeUnlocked()
+    return ns.Movers and ns.Movers.IsUnlocked and ns.Movers:IsUnlocked()
+end
+
+local function ShouldUseMoverPreview(frame)
+    return frame and frame.unit and not IsBossUnit(frame.unit) and IsMoveModeUnlocked()
+end
+
+local function GetUnitEnabled(unit)
+    local unitDB = ns.db and ns.db.profile and ns.db.profile.unitframes and ns.db.profile.unitframes[unit]
+    return unitDB and unitDB.enabled ~= false
+end
+
+local function SetCooldownTextVisibility(cooldown, enabled)
+    if not cooldown or not cooldown.SetHideCountdownNumbers then
+        return
+    end
+
+    local ok = pcall(function()
+        cooldown:SetHideCountdownNumbers(not enabled)
+    end)
+
+    if not ok then
+        pcall(cooldown.SetHideCountdownNumbers, cooldown, true)
+    end
+end
+
+local function ApplyDebuffCooldownTextSetting(button, db)
+    if not button or not button.cooldown then
+        return
+    end
+
+    SetCooldownTextVisibility(button.cooldown, db and db.cooldownText == true)
 end
 
 local function CreateDebuffButton(parent, size)
@@ -60,9 +143,7 @@ local function CreateDebuffButton(parent, size)
     button.cooldown:SetReverse(true)
     button.cooldown:SetEdgeColor(1, 0, 0, 1)
 
-    if button.cooldown.SetHideCountdownNumbers then
-        button.cooldown:SetHideCountdownNumbers(true)
-    end
+    SetCooldownTextVisibility(button.cooldown, false)
 
     button.count = button:CreateFontString(nil, "OVERLAY", "NumberFontNormalSmall")
     button.count:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -1, 1)
@@ -97,6 +178,36 @@ local function CreateDebuffButton(parent, size)
     button:SetScript("OnLeave", function()
         GameTooltip:Hide()
     end)
+
+    return button
+end
+
+local function CreatePreviewDebuffButton(parent, size)
+    local button = CreateFrame("Frame", nil, parent, "BackdropTemplate")
+    button:SetSize(size, size)
+    button:EnableMouse(false)
+
+    button.icon = button:CreateTexture(nil, "ARTWORK")
+    button.icon:SetAllPoints()
+    button.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+
+    button.cooldown = CreateFrame("Cooldown", nil, button, "CooldownFrameTemplate")
+    button.cooldown:SetAllPoints()
+    button.cooldown:SetDrawEdge(false)
+    button.cooldown:SetDrawSwipe(true)
+    button.cooldown:SetReverse(true)
+    SetCooldownTextVisibility(button.cooldown, false)
+    button.cooldown:Hide()
+
+    button.count = button:CreateFontString(nil, "OVERLAY", "NumberFontNormalSmall")
+    button.count:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -1, 1)
+    button.count:SetJustifyH("RIGHT")
+
+    button.border = button:CreateTexture(nil, "OVERLAY")
+    button.border:SetAllPoints()
+    button.border:SetTexture("Interface\\Buttons\\UI-Debuff-Overlays")
+    button.border:SetTexCoord(0.296875, 0.5703125, 0, 0.515625)
+    button.border:SetVertexColor(1, 0, 0, 1)
 
     return button
 end
@@ -139,61 +250,140 @@ local function ApplyDebuffLayout(frame, db)
     debuffs:SetSize((iconSize * maxIcons) + (spacing * (maxIcons - 1)), iconSize)
 end
 
-local function GetDebuffData(unit, index)
-    local filter = "HARMFUL"
+local function ApplyDebuffLayoutToHolder(relativeFrame, holder, db)
+    if not relativeFrame or not holder or not holder.buttons then
+        return
+    end
 
-    if useLegacyUnitDebuff then
-        local name, icon, count, debuffType, duration, expirationTime = UnitDebuff(unit, index, filter)
-        if not name or not icon then
+    local anchor = anchorValues[db.anchor] and db.anchor or "TOPLEFT"
+    local iconSize = math.max(10, db.size or DEFAULT_ICON_SIZE)
+    local spacing = db.spacing or DEFAULT_SPACING
+    local maxIcons = math.max(1, math.min(db.maxIcons or DEFAULT_MAX_ICONS, #holder.buttons))
+    local growLeft = db.growth == "LEFT"
+
+    holder:ClearAllPoints()
+    holder:SetPoint(anchor, relativeFrame, anchor, db.x or 0, db.y or 0)
+    holder:SetSize((iconSize * maxIcons) + (spacing * math.max(maxIcons - 1, 0)), iconSize)
+
+    for i, button in ipairs(holder.buttons) do
+        button:ClearAllPoints()
+        button:SetSize(iconSize, iconSize)
+        button.__baseAnchor = anchor
+
+        local offset = (i - 1) * (iconSize + spacing)
+        local xOffset = growLeft and -offset or offset
+        button.__baseX = xOffset
+        button.__baseY = 0
+        button:SetPoint(anchor, holder, anchor, xOffset, 0)
+
+        if i > maxIcons then
+            button:Hide()
+        end
+    end
+end
+
+local function SafeAuraNumber(value, fallback)
+    if value == nil then
+        return fallback
+    end
+
+    local ok, numberValue = pcall(function()
+        local n = tonumber(value)
+        if n == nil then
             return nil
         end
 
-        return {
-            icon = icon,
-            count = count,
-            debuffType = debuffType,
-            duration = duration,
-            expirationTime = expirationTime,
-            hasSafeTimer = true,
-            index = index,
-            filter = filter,
-        }
-    end
-
-    if useUnitAura then
-        local name, icon, count, debuffType, duration, expirationTime = UnitAura(unit, index, filter)
-        if not name or not icon then
-            return nil
+        -- Some aura APIs can return protected/secret numeric values.
+        -- Validate inside pcall so comparison/arithmetic errors do not break unit frames.
+        if n > -math.huge then
+            return n
         end
 
-        return {
-            icon = icon,
-            count = count,
-            debuffType = debuffType,
-            duration = duration,
-            expirationTime = expirationTime,
-            hasSafeTimer = true,
-            index = index,
-            filter = filter,
-        }
+        return nil
+    end)
+
+    if ok and type(numberValue) == "number" then
+        return numberValue
     end
 
+    return fallback
+end
+
+local function SafeAuraString(value, fallback)
+    if value == nil then
+        return fallback
+    end
+
+    local ok, stringValue = pcall(function()
+        local s = tostring(value)
+        if s and s ~= "" then
+            return s
+        end
+
+        return nil
+    end)
+
+    if ok and type(stringValue) == "string" then
+        return stringValue
+    end
+
+    return fallback
+end
+
+local function GetDebuffCountText(count)
+    local ok, text = pcall(function()
+        local n = tonumber(count)
+        if n and n > 1 then
+            return tostring(n)
+        end
+
+        return ""
+    end)
+
+    return ok and text or ""
+end
+
+local function GetDebuffCooldownValues(aura)
+    if not aura or not aura.hasSafeTimer then
+        return nil, nil
+    end
+
+    local ok, start, duration = pcall(function()
+        local d = tonumber(aura.duration)
+        local e = tonumber(aura.expirationTime)
+
+        if d and e and d > 0 then
+            return e - d, d
+        end
+
+        return nil, nil
+    end)
+
+    if ok and start and duration then
+        return start, duration
+    end
+
+    return nil, nil
+end
+
+local function GetDebuffData(unit, index, filter)
+    filter = filter or "HARMFUL"
+
+    -- Retail 12.x can return secret timing/count values from legacy aura APIs.
+    -- Prefer C_UnitAuras so we can later feed its auraInstanceID into the
+    -- duration-object cooldown API instead of comparing/passing secret numbers.
     if useCUnitAuras then
-        local aura = C_UnitAuras.GetAuraDataByIndex(unit, index, filter)
-        if not aura or not aura.icon then
+        local ok, aura = pcall(C_UnitAuras.GetAuraDataByIndex, unit, index, filter)
+        if not ok or not aura or not aura.icon then
             return nil
         end
-
-        local d = tonumber(aura.duration) or 0
-        local e = tonumber(aura.expirationTime) or 0
-        local c = tonumber(aura.applications) or 0
 
         return {
             icon = aura.icon,
-            count = c,
-            debuffType = aura.dispelName,
-            duration = d,
-            expirationTime = e,
+            count = SafeAuraNumber(aura.applications, 0),
+            debuffType = SafeAuraString(aura.dispelName, "none"),
+            duration = SafeAuraNumber(aura.duration, 0),
+            expirationTime = SafeAuraNumber(aura.expirationTime, 0),
             auraInstanceID = aura.auraInstanceID,
             hasSafeTimer = true,
             index = index,
@@ -201,7 +391,88 @@ local function GetDebuffData(unit, index)
         }
     end
 
+    if useLegacyUnitDebuff then
+        local ok, name, icon, count, debuffType, duration, expirationTime = pcall(UnitDebuff, unit, index, filter)
+        if not ok or not name or not icon then
+            return nil
+        end
+
+        return {
+            icon = icon,
+            count = SafeAuraNumber(count, 0),
+            debuffType = SafeAuraString(debuffType, "none"),
+            duration = SafeAuraNumber(duration, 0),
+            expirationTime = SafeAuraNumber(expirationTime, 0),
+            hasSafeTimer = true,
+            index = index,
+            filter = filter,
+        }
+    end
+
+    if useUnitAura then
+        local ok, name, icon, count, debuffType, duration, expirationTime = pcall(UnitAura, unit, index, filter)
+        if not ok or not name or not icon then
+            return nil
+        end
+
+        return {
+            icon = icon,
+            count = SafeAuraNumber(count, 0),
+            debuffType = SafeAuraString(debuffType, "none"),
+            duration = SafeAuraNumber(duration, 0),
+            expirationTime = SafeAuraNumber(expirationTime, 0),
+            hasSafeTimer = true,
+            index = index,
+            filter = filter,
+        }
+    end
+
     return nil
+end
+
+local function GetDebuffApplicationText(unit, aura)
+    if aura and aura.auraInstanceID and C_UnitAuras and type(C_UnitAuras.GetAuraApplicationDisplayCount) == "function" then
+        local ok, text = pcall(C_UnitAuras.GetAuraApplicationDisplayCount, unit, aura.auraInstanceID, 2, 999)
+        if ok and text ~= nil then
+            return text
+        end
+    end
+
+    return GetDebuffCountText(aura and aura.count)
+end
+
+local function ApplyDebuffCooldown(button, unit, aura)
+    if not button or not button.cooldown then
+        return
+    end
+
+    if aura and aura.auraInstanceID and C_UnitAuras and type(C_UnitAuras.GetAuraDuration) == "function" and button.cooldown.SetCooldownFromDurationObject then
+        local okDuration, durationObject = pcall(C_UnitAuras.GetAuraDuration, unit, aura.auraInstanceID)
+        if okDuration and durationObject then
+            local okCooldown = pcall(function()
+                button.cooldown:SetCooldownFromDurationObject(durationObject, true)
+            end)
+
+            if okCooldown then
+                button.cooldown:Show()
+                return
+            end
+        end
+    end
+
+    local cooldownStart, cooldownDuration = GetDebuffCooldownValues(aura)
+    if cooldownStart and cooldownDuration then
+        local cooldownOk = pcall(function()
+            button.cooldown:SetCooldown(cooldownStart, cooldownDuration)
+        end)
+
+        if cooldownOk then
+            button.cooldown:Show()
+            return
+        end
+    end
+
+    button.cooldown:Hide()
 end
 
 local function ApplyDebuffBorder(button, debuffType)
@@ -214,13 +485,146 @@ local function ApplyDebuffBorder(button, debuffType)
     end
 end
 
+local function FillPreviewDebuffs(holder, db)
+    if not holder or not holder.buttons then
+        return
+    end
+
+    local maxIcons = math.max(1, math.min(db.maxIcons or DEFAULT_MAX_ICONS, #holder.buttons))
+
+    for i, button in ipairs(holder.buttons) do
+        if i <= maxIcons then
+            button.unit = nil
+            button.auraIndex = nil
+            button.auraFilter = nil
+            button.auraInstanceID = nil
+            button.icon:SetTexture(PREVIEW_TEXTURES[((i - 1) % #PREVIEW_TEXTURES) + 1])
+            button.count:SetText((i == 2 or i == 5 or i == 8) and "2" or "")
+            if button.cooldown then
+                ApplyDebuffCooldownTextSetting(button, db)
+                if db and db.cooldownText == true and type(GetTime) == "function" then
+                    button.cooldown:SetCooldown(GetTime() - 12, 45)
+                    button.cooldown:Show()
+                else
+                    button.cooldown:Hide()
+                end
+            end
+            ApplyDebuffBorder(button, PREVIEW_DEBUFF_TYPES[((i - 1) % #PREVIEW_DEBUFF_TYPES) + 1])
+            button:Show()
+        else
+            button:Hide()
+        end
+    end
+end
+
+local function EnsureMoverPreviewHolder(mover)
+    if not mover then
+        return nil
+    end
+
+    if mover.DeBuffPreviewIndicators then
+        return mover.DeBuffPreviewIndicators
+    end
+
+    local holder = CreateFrame("Frame", nil, mover)
+    holder:SetFrameLevel(mover:GetFrameLevel() + 5)
+    holder:EnableMouse(false)
+    holder.buttons = {}
+
+    for i = 1, 20 do
+        holder.buttons[i] = CreatePreviewDebuffButton(holder, DEFAULT_ICON_SIZE)
+    end
+
+    mover.DeBuffPreviewIndicators = holder
+    return holder
+end
+
+local function HideMoverPreviewHolder(mover)
+    if mover and mover.DeBuffPreviewIndicators then
+        mover.DeBuffPreviewIndicators:Hide()
+    end
+end
+
+local function UpdateMoverPreviewForUnit(unit)
+    if not ns.Movers or not ns.Movers.GetMover then
+        return
+    end
+
+    local mover = ns.Movers:GetMover(unit)
+    if not mover then
+        return
+    end
+
+    local db = GetDebuffDB(unit)
+    if not IsMoveModeUnlocked() or not db or db.enabled == false or not GetUnitEnabled(unit) then
+        HideMoverPreviewHolder(mover)
+        return
+    end
+
+    local holder = EnsureMoverPreviewHolder(mover)
+    if not holder then
+        return
+    end
+
+    ApplyDebuffLayoutToHolder(mover, holder, db)
+    FillPreviewDebuffs(holder, db)
+    holder:Show()
+end
+
+function ns:UpdateMoveModeDeBuffPreviews(unit)
+    if unit then
+        UpdateMoverPreviewForUnit(unit)
+        return
+    end
+
+    for _, unitKey in ipairs(PREVIEW_UNITS) do
+        UpdateMoverPreviewForUnit(unitKey)
+    end
+end
+
+function ns:HideMoveModeDeBuffPreviews()
+    if not ns.Movers or not ns.Movers.GetMover then
+        return
+    end
+
+    for _, unitKey in ipairs(PREVIEW_UNITS) do
+        HideMoverPreviewHolder(ns.Movers:GetMover(unitKey))
+    end
+end
+
+function ns:RefreshDeBuffIndicatorPreviewFrames()
+    for _, unitKey in ipairs(PREVIEW_UNITS) do
+        local frame = ns[frameRefs[unitKey]]
+        if frame and frame.DeBuffIndicators then
+            ns:UpdateDeBuffIndicators(frame)
+        end
+    end
+
+    if IsMoveModeUnlocked() then
+        ns:UpdateMoveModeDeBuffPreviews()
+    else
+        ns:HideMoveModeDeBuffPreviews()
+    end
+end
+
 function ns:UpdateDeBuffIndicators(frame)
     if not frame or not frame.DeBuffIndicators then
         return
     end
 
     local db = GetDebuffDB(frame.unit)
-    if not db or db.enabled == false or not UnitExists(frame.unit) then
+    if not db or db.enabled == false then
+        frame.DeBuffIndicators:Hide()
+        return
+    end
+
+    if ShouldUseMoverPreview(frame) then
+        frame.DeBuffIndicators:Hide()
+        UpdateMoverPreviewForUnit(frame.unit)
+        return
+    end
+
+    if not UnitExists(frame.unit) then
         frame.DeBuffIndicators:Hide()
         return
     end
@@ -229,6 +633,7 @@ function ns:UpdateDeBuffIndicators(frame)
     frame.DeBuffIndicators:Show()
 
     local maxIcons = math.max(1, db.maxIcons or DEFAULT_MAX_ICONS)
+    local auraFilter = GetDebuffFilter(db)
 
     for i = 1, #frame.DeBuffIndicators.buttons do
         local button = frame.DeBuffIndicators.buttons[i]
@@ -236,14 +641,15 @@ function ns:UpdateDeBuffIndicators(frame)
             button:SetScale(1)
             button:Hide()
         else
-            local aura = GetDebuffData(frame.unit, i)
+            local aura = GetDebuffData(frame.unit, i, auraFilter)
             if aura then
                 button.unit = frame.unit
                 button.auraIndex = aura.index
                 button.auraFilter = aura.filter
                 button.auraInstanceID = aura.auraInstanceID
                 button.icon:SetTexture(aura.icon)
-                button.count:SetText((aura.count and aura.count > 1) and aura.count or "")
+                button.count:SetText(GetDebuffApplicationText(frame.unit, aura))
+                ApplyDebuffCooldownTextSetting(button, db)
                 ApplyDebuffBorder(button, aura.debuffType)
                 button:SetScale(1)
                 button:ClearAllPoints()
@@ -255,15 +661,7 @@ function ns:UpdateDeBuffIndicators(frame)
                     button.__baseY or 0
                 )
 
-                if aura.hasSafeTimer and aura.duration and aura.duration > 0 and aura.expirationTime then
-                    pcall(function()
-                        local start = aura.expirationTime - aura.duration
-                        button.cooldown:SetCooldown(start, aura.duration)
-                        button.cooldown:Show()
-                    end)
-                else
-                    button.cooldown:Hide()
-                end
+                ApplyDebuffCooldown(button, frame.unit, aura)
 
                 button:Show()
             else
