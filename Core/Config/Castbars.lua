@@ -315,7 +315,7 @@ function ns:CreateCastbarOptions()
                 },
             },
             player = { type = "group", name = "플레이어", order = 2, args = CreateCastbarGroup("player", "플레이어").args },
-            target = { type = "group", name = "타겟", order = 3, args = CreateCastbarGroup("target", "타겟").args },
+            target = { type = "group", name = "대상", order = 3, args = CreateCastbarGroup("target", "대상").args },
             pet    = { type = "group", name = "소환수", order = 4, args = CreateCastbarGroup("pet", "소환수").args },
         },
     }
