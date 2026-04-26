@@ -64,8 +64,8 @@ function ns:CreateKeystoneReporter()
                         type = "toggle",
                         name = "전문화",
                         desc = "보고 메시지에 현재 전문화를 포함합니다.",
-                        order = 1,
                         width = "half",
+                        order = 1,
                         get = function()
                             return GetReportFieldValue("showSpec")
                         end,
@@ -75,10 +75,10 @@ function ns:CreateKeystoneReporter()
                     },
                     showItemLevel = {
                         type = "toggle",
-                        name = "템렙 / 아이템 레벨",
+                        name = "템렙",
                         desc = "보고 메시지에 현재 착용 아이템 레벨을 포함합니다.",
-                        order = 2,
                         width = "half",
+                        order = 2,
                         get = function()
                             return GetReportFieldValue("showItemLevel")
                         end,
@@ -91,7 +91,6 @@ function ns:CreateKeystoneReporter()
                         name = "점수",
                         desc = "보고 메시지에 쐐기 점수를 포함합니다.",
                         order = 3,
-                        width = "half",
                         get = function()
                             return GetReportFieldValue("showScore")
                         end,
