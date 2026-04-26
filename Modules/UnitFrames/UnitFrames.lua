@@ -3,6 +3,61 @@ local _, ns = ...
 ns.Modules.UnitFrames = ns.Modules.UnitFrames or {}
 
 local spawned = false
+local pendingCombatRefresh = {}
+local combatRefreshEventFrame
+
+local function IsCombatLockedProtectedFrame(frame)
+    if not frame or not InCombatLockdown or not InCombatLockdown() then
+        return false
+    end
+
+    if frame.IsProtected then
+        local ok, isProtected = pcall(frame.IsProtected, frame)
+        if ok and isProtected then
+            return true
+        end
+    end
+
+    return false
+end
+
+local function EnsureCombatRefreshEventFrame()
+    if combatRefreshEventFrame then
+        return combatRefreshEventFrame
+    end
+
+    combatRefreshEventFrame = CreateFrame("Frame")
+    combatRefreshEventFrame:SetScript("OnEvent", function(self, event)
+        if event ~= "PLAYER_REGEN_ENABLED" then
+            return
+        end
+
+        self:UnregisterEvent("PLAYER_REGEN_ENABLED")
+
+        local queued = {}
+        for key in pairs(pendingCombatRefresh) do
+            queued[#queued + 1] = key
+            pendingCombatRefresh[key] = nil
+        end
+
+        for _, key in ipairs(queued) do
+            if ns.Modules.UnitFrames and ns.Modules.UnitFrames.RefreshUnit then
+                ns.Modules.UnitFrames:RefreshUnit(key)
+            end
+        end
+    end)
+
+    return combatRefreshEventFrame
+end
+
+local function QueueCombatRefresh(key)
+    if not key then
+        return
+    end
+
+    pendingCombatRefresh[key] = true
+    EnsureCombatRefreshEventFrame():RegisterEvent("PLAYER_REGEN_ENABLED")
+end
 
 local frameMap = {
     player = "PlayerFrame",
@@ -95,7 +150,8 @@ local function ApplyFrameSettings(key)
         return
     end
 
-    if InCombatLockdown() then
+    if InCombatLockdown and InCombatLockdown() then
+        QueueCombatRefresh(key)
         return
     end
 
@@ -156,7 +212,11 @@ function ns.Modules.UnitFrames:RefreshUnit(key)
         end
 
         if frame and ns.db.profile.unitframes[key] and not ns.db.profile.unitframes[key].enabled then
-            frame:Hide()
+            if IsCombatLockedProtectedFrame(frame) then
+                QueueCombatRefresh(key)
+            else
+                frame:Hide()
+            end
         end
     end
 
