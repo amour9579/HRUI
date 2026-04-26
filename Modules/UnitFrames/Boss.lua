@@ -25,7 +25,7 @@ local function GetBossDB()
         healthText = { enabled = true, anchor = "RIGHT", x = -8, y = 0, format = "value", fontSize = 11, },
         powerText = { enabled = false, anchor = "CENTER", x = 0, y = 0, format = "value", fontSize = 10, },
         buffs = { enabled = false, size = 18, spacing = 2, maxIcons = 8, anchor = "TOPRIGHT", x = 0, y = 4, growth = "LEFT", },
-        debuffs = { enabled = false, size = 18, spacing = 2, maxIcons = 8, anchor = "TOPLEFT", x = 0, y = 4, growth = "RIGHT", },
+        debuffs = { enabled = false, filterMode = "all", cooldownText = false, size = 18, spacing = 2, maxIcons = 8, anchor = "TOPLEFT", x = 0, y = 4, growth = "RIGHT", },
     }
 
     local db = ufdb.boss
@@ -40,7 +40,9 @@ local function GetBossDB()
     db.healthText = db.healthText or { enabled = true, anchor = "RIGHT", x = -8, y = 0, format = "value", fontSize = 11, }
     db.powerText = db.powerText or { enabled = false, anchor = "CENTER", x = 0, y = 0, format = "value", fontSize = 10, }
     db.buffs = db.buffs or { enabled = false, size = 18, spacing = 2, maxIcons = 8, anchor = "TOPRIGHT", x = 0, y = 4, growth = "LEFT", }
-    db.debuffs = db.debuffs or { enabled = false, size = 18, spacing = 2, maxIcons = 8, anchor = "TOPLEFT", x = 0, y = 4, growth = "RIGHT", }
+    db.debuffs = db.debuffs or { enabled = false, filterMode = "all", cooldownText = false, size = 18, spacing = 2, maxIcons = 8, anchor = "TOPLEFT", x = 0, y = 4, growth = "RIGHT", }
+    db.debuffs.filterMode = db.debuffs.filterMode or "all"
+    db.debuffs.cooldownText = db.debuffs.cooldownText == true
 
     for i = 1, GetMaxBossFrames() do
         ufdb["boss" .. i] = db
@@ -144,7 +146,37 @@ local function SetPreviewTextPosition(fontString, relativeFrame, cfg, defaultAnc
     end
 end
 
-local function CreatePreviewBuffButton(parent)
+local function SetPreviewCooldownText(button, enabled)
+    if not button or not button.cooldown or not button.cooldown.SetHideCountdownNumbers then
+        return
+    end
+
+    pcall(button.cooldown.SetHideCountdownNumbers, button.cooldown, not enabled)
+end
+
+local function ApplyPreviewCooldown(button, cfg)
+    if not button or not button.cooldown then
+        return
+    end
+
+    local enabled = cfg and cfg.cooldownText == true
+    SetPreviewCooldownText(button, enabled)
+
+    if enabled and type(GetTime) == "function" then
+        local ok = pcall(function()
+            button.cooldown:SetCooldown(GetTime() - 12, 45)
+        end)
+
+        if ok then
+            button.cooldown:Show()
+            return
+        end
+    end
+
+    button.cooldown:Hide()
+end
+
+local function CreatePreviewBuffButton(parent, withCooldown)
     local button = CreateFrame("Frame", nil, parent, "BackdropTemplate")
     button:EnableMouse(false)
 
@@ -152,6 +184,16 @@ local function CreatePreviewBuffButton(parent)
     button.icon:SetAllPoints()
     button.icon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
     button.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+
+    if withCooldown then
+        button.cooldown = CreateFrame("Cooldown", nil, button, "CooldownFrameTemplate")
+        button.cooldown:SetAllPoints()
+        button.cooldown:SetDrawEdge(false)
+        button.cooldown:SetDrawSwipe(true)
+        button.cooldown:SetReverse(true)
+        SetPreviewCooldownText(button, false)
+        button.cooldown:Hide()
+    end
 
     button:SetBackdrop({
         edgeFile = "Interface\\Buttons\\WHITE8x8",
@@ -191,8 +233,12 @@ local function ApplyPreviewAuras(frame, holder, cfg, defaultAnchor, defaultGrowt
             local offset = (i - 1) * (size + spacing)
             local x = growLeft and -offset or offset
             button:SetPoint(anchor, holder, anchor, x, 0)
+            ApplyPreviewCooldown(button, cfg)
             button:Show()
         else
+            if button.cooldown then
+                button.cooldown:Hide()
+            end
             button:Hide()
         end
     end
@@ -280,7 +326,7 @@ local function CreateBossPreviewFrame(parent, index)
     debuffs:SetFrameLevel(overlay:GetFrameLevel() + 2)
     debuffs.buttons = {}
     for i = 1, 20 do
-        debuffs.buttons[i] = CreatePreviewBuffButton(debuffs)
+        debuffs.buttons[i] = CreatePreviewBuffButton(debuffs, true)
         debuffs.buttons[i]:SetBackdropBorderColor(1, 0, 0, 1)
     end
     frame.Debuffs = debuffs
