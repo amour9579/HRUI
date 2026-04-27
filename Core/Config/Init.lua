@@ -13,6 +13,7 @@ function ns:BuildOptions()
             itemTooltip = ns:CreateItemTooltipOptions(),
             chat = ns:CreateChatOptions(),
             keystone = ns:CreateKeystoneReporter(),
+            autogreeting = ns:CreateAutoGreetingOptions(),
             dice = ns:CreateDiceOptions(),
             profiles = ns:CreateProfileOptions(),
         },
