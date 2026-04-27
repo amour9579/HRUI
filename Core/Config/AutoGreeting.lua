@@ -3,8 +3,8 @@ local _, ns = ...
 local DEFAULT_JOIN_MESSAGE = "안녕 하세요"
 local DEFAULT_CHALLENGE_COMPLETED_MESSAGE = "수고 하셨습니다"
 local DEFAULT_SUMMON_MESSAGE = "감사 합니다"
-
 local DEFAULT_LEADER_JOIN_MESSAGE = "어서 오세요"
+local DEFAULT_GREETING_DELAY = 2
 
 local function GetAutoGreetingDB()
     ns.db.profile.chat = ns.db.profile.chat or {}
@@ -61,6 +61,11 @@ local function GetAutoGreetingDB()
         db.leaderJoinMessage = DEFAULT_LEADER_JOIN_MESSAGE
     end
 
+    if db.delay == nil then
+        db.delay = DEFAULT_GREETING_DELAY
+    end
+
+    db.delay = tonumber(db.delay) or DEFAULT_GREETING_DELAY
     return db
 end
 
@@ -165,11 +170,32 @@ function ns:CreateAutoGreetingOptions()
                 end,
             },
 
+            delay = {
+                type = "range",
+                name = "인사 지연 시간",
+                desc = "자동 인사 메시지를 보내기 전까지 기다릴 시간입니다. 모든 자동 인사에 동일하게 적용됩니다.",
+                order = 6.1,
+                min = 0,
+                max = 10,
+                step = 0.5,
+                disabled = function()
+                    return not GetAutoGreetingDB().enabled
+                end,
+                get = function()
+                    return GetAutoGreetingDB().delay or DEFAULT_GREETING_DELAY
+                end,
+                set = function(_, value)
+                    GetAutoGreetingDB().delay = value
+                    if ns.AutoGreeting and ns.AutoGreeting.Refresh then
+                        ns.AutoGreeting:Refresh()
+                    end
+                end,
+            },
             break1 = {
                 type = "description",
                 name = "",
                 width = "full",
-                order = 6.1,
+                order = 6.2,
             },
 
             joinMessage = {
