@@ -138,6 +138,7 @@ ns.Defaults = {
                 summonMessage = "감사 합니다",
                 leaderJoinEnabled = true,
                 leaderJoinMessage = "어서 오세요",
+                delay = 2,
             },
 
             infoBar = {
