@@ -1,33 +1,6 @@
 local _, ns = ...
 
-local spellcastEvents = {
-    "UNIT_SPELLCAST_START",
-    "UNIT_SPELLCAST_STOP",
-    "UNIT_SPELLCAST_FAILED",
-    "UNIT_SPELLCAST_INTERRUPTED",
-    "UNIT_SPELLCAST_DELAYED",
-    "UNIT_SPELLCAST_CHANNEL_START",
-    "UNIT_SPELLCAST_CHANNEL_UPDATE",
-    "UNIT_SPELLCAST_CHANNEL_STOP",
-    "UNIT_SPELLCAST_INTERRUPTIBLE",
-    "UNIT_SPELLCAST_NOT_INTERRUPTIBLE",
-}
-
-local stopEvents = {
-    UNIT_SPELLCAST_STOP = true,
-    UNIT_SPELLCAST_FAILED = true,
-    UNIT_SPELLCAST_INTERRUPTED = true,
-    UNIT_SPELLCAST_CHANNEL_STOP = true,
-}
-
-local restartEvents = {
-    UNIT_SPELLCAST_START = true,
-    UNIT_SPELLCAST_DELAYED = true,
-    UNIT_SPELLCAST_CHANNEL_START = true,
-    UNIT_SPELLCAST_CHANNEL_UPDATE = true,
-    UNIT_SPELLCAST_INTERRUPTIBLE = true,
-    UNIT_SPELLCAST_NOT_INTERRUPTIBLE = true,
-}
+local POLL_INTERVAL = 0.05
 
 local function GetTargetCastbarStyle()
     local style = ns.db
@@ -49,6 +22,7 @@ local function ResetTargetCastbar(frame)
 
     ns:ResetCastbar(frame)
 end
+
 local function SafeSetText(fontString, text)
     if not fontString then
         return
@@ -77,7 +51,8 @@ local function CopyUnitDuration(durationFunc, unit)
     end
 
     local ok, duration = pcall(function()
-        return durationFunc(unit):Copy()
+        local d = durationFunc(unit)
+        return d:Copy()
     end)
 
     if ok then
@@ -86,23 +61,9 @@ local function CopyUnitDuration(durationFunc, unit)
 
     return nil
 end
-local function GetTargetCastUnit(eventUnit)
-    if eventUnit
-        and UnitExists(eventUnit)
-        and UnitExists("target")
-        and UnitIsUnit(eventUnit, "target") then
-        return eventUnit
-    end
-
-    if UnitExists("target") then
-        return "target"
-    end
-
-    return nil
-end
 
 local function StartTargetDurationCastbar(frame, spellName, icon, duration, isChannel)
-    if not frame or not duration or not frame.SetTimerDuration then
+    if not frame or duration == nil or not frame.SetTimerDuration then
         return
     end
 
@@ -127,17 +88,13 @@ local function StartTargetDurationCastbar(frame, spellName, icon, duration, isCh
         direction
     )
 
-    if frame.Text then
-        SafeSetText(frame.Text, spellName)
-    end
+    SafeSetText(frame.Text, spellName)
 
     if frame.Time then
         frame.Time:SetText("")
     end
 
-    if frame.Icon then
-        SafeSetTexture(frame.Icon, icon)
-    end
+    SafeSetTexture(frame.Icon, icon)
 
     if frame.Spark then
         frame.Spark:Hide()
@@ -152,9 +109,12 @@ local function StartTargetDurationCastbar(frame, spellName, icon, duration, isCh
     frame:Show()
 end
 
-local function UpdateTargetCastState(frame, eventUnit, forceRestart)
+local function UpdateTargetCastState(frame)
     if not frame
-        or not UnitExists("target")
+        or not ns.db
+        or not ns.db.profile
+        or not ns.db.profile.castbars
+        or not ns.db.profile.castbars.target
         or not ns.db.profile.castbars.target.enabled then
         if frame then
             ResetTargetCastbar(frame)
@@ -163,33 +123,22 @@ local function UpdateTargetCastState(frame, eventUnit, forceRestart)
         return
     end
 
-    local unit = GetTargetCastUnit(eventUnit)
-    if not unit then
+    if not UnitExists("target") then
         ResetTargetCastbar(frame)
         return
     end
 
-    local castDuration = CopyUnitDuration(UnitCastingDuration, unit)
-    if castDuration then
-        if forceRestart
-            or not frame.__HRUI_TargetDurationActive
-            or frame.__HRUI_TargetDurationKind ~= "cast" then
-            local name, _, texture = UnitCastingInfo(unit)
-            StartTargetDurationCastbar(frame, name, texture, castDuration, false)
-        end
-
+    local castDuration = CopyUnitDuration(UnitCastingDuration, "target")
+    if castDuration ~= nil then
+        local name, _, texture = UnitCastingInfo("target")
+        StartTargetDurationCastbar(frame, name, texture, castDuration, false)
         return
     end
 
-    local channelDuration = CopyUnitDuration(UnitChannelDuration, unit)
-    if channelDuration then
-        if forceRestart
-            or not frame.__HRUI_TargetDurationActive
-            or frame.__HRUI_TargetDurationKind ~= "channel" then
-            local chName, _, chTexture = UnitChannelInfo(unit)
-            StartTargetDurationCastbar(frame, chName, chTexture, channelDuration, true)
-        end
-
+    local channelDuration = CopyUnitDuration(UnitChannelDuration, "target")
+    if channelDuration ~= nil then
+        local chName, _, chTexture = UnitChannelInfo("target")
+        StartTargetDurationCastbar(frame, chName, chTexture, channelDuration, true)
         return
     end
 
@@ -218,48 +167,20 @@ function ns:SpawnTargetCastbar()
     frame:SetScript("OnUpdate", function(self, elapsed)
         self.__HRUI_TargetCastPoll = (self.__HRUI_TargetCastPoll or 0) + (elapsed or 0)
 
-        if self.__HRUI_TargetCastPoll >= 0.10 then
+        if self.__HRUI_TargetCastPoll >= POLL_INTERVAL then
             self.__HRUI_TargetCastPoll = 0
-            UpdateTargetCastState(self, nil, false)
+            UpdateTargetCastState(self)
         end
     end)
 
     frame:RegisterEvent("PLAYER_TARGET_CHANGED")
     frame:RegisterEvent("PLAYER_ENTERING_WORLD")
-    frame:RegisterEvent("NAME_PLATE_UNIT_ADDED")
 
-    for _, event in ipairs(spellcastEvents) do
-        frame:RegisterEvent(event)
-    end
-
-    frame:SetScript("OnEvent", function(self, event, unit)
+    frame:SetScript("OnEvent", function(self, event)
         if event == "PLAYER_TARGET_CHANGED" or event == "PLAYER_ENTERING_WORLD" then
             ResetTargetCastbar(self)
-            UpdateTargetCastState(self, nil, true)
-            return
+            UpdateTargetCastState(self)
         end
-
-        if event == "NAME_PLATE_UNIT_ADDED" then
-            if unit and UnitExists("target") and UnitIsUnit(unit, "target") then
-                UpdateTargetCastState(self, unit, true)
-            end
-            return
-        end
-
-        if not unit or not UnitExists("target") then
-            return
-        end
-
-        if unit ~= "target" and not UnitIsUnit(unit, "target") then
-            return
-        end
-
-        if stopEvents[event] then
-            ResetTargetCastbar(self)
-            return
-        end
-
-        UpdateTargetCastState(self, unit, restartEvents[event] == true)
     end)
 
     ns.TargetCastbar = frame
