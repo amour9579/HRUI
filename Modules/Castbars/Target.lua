@@ -19,6 +19,29 @@ local stopEvents = {
     UNIT_SPELLCAST_CHANNEL_STOP = true,
 }
 
+local function ToNumber(value)
+    if value == nil then
+        return 0
+    end
+
+    local n = tonumber(value)
+    if n then
+        return n
+    end
+
+    n = tonumber(tostring(value))
+    return n or 0
+end
+
+local function ResetTargetCastbar(frame)
+    if frame then
+        frame.__HRUI_TargetCastType = nil
+        frame.__HRUI_TargetCastStartMS = nil
+        frame.__HRUI_TargetCastEndMS = nil
+    end
+
+    ns:ResetCastbar(frame)
+end
 local function GetTargetCastUnit(eventUnit)
     if eventUnit and UnitExists(eventUnit) and UnitExists("target") and UnitIsUnit(eventUnit, "target") then
         return eventUnit
@@ -45,32 +68,43 @@ local function UpdateTargetCastState(frame, eventUnit)
         return
     end
 
-    local name, _, texture, startTimeMS, endTimeMS, _, _, notInterruptible, spellID = UnitCastingInfo(unit)
+    local name, _, texture, startTimeMS, endTimeMS, _, _, notInterruptible = UnitCastingInfo(unit)
     if name and startTimeMS and endTimeMS then
-        local castKey = "cast:" ..
-            tostring(spellID or name) .. ":" .. tostring(startTimeMS) .. ":" .. tostring(endTimeMS)
+        local startMS = ToNumber(startTimeMS)
+        local endMS = ToNumber(endTimeMS)
 
-        if frame.__HRUI_TargetCastKey ~= castKey then
-            frame.__HRUI_TargetCastKey = castKey
+        if frame.__HRUI_TargetCastType ~= 1
+            or frame.__HRUI_TargetCastStartMS ~= startMS
+            or frame.__HRUI_TargetCastEndMS ~= endMS then
+            frame.__HRUI_TargetCastType = 1
+            frame.__HRUI_TargetCastStartMS = startMS
+            frame.__HRUI_TargetCastEndMS = endMS
+
             ns:StartCastbarCast(frame, name, texture, startTimeMS, endTimeMS, notInterruptible)
         end
+
         return
     end
 
-    local chName, _, chTexture, chStartTimeMS, chEndTimeMS, _, chNotInterruptible, chSpellID = UnitChannelInfo(unit)
+    local chName, _, chTexture, chStartTimeMS, chEndTimeMS, _, chNotInterruptible = UnitChannelInfo(unit)
     if chName and chStartTimeMS and chEndTimeMS then
-        local castKey = "channel:" ..
-            tostring(chSpellID or chName) .. ":" .. tostring(chStartTimeMS) .. ":" .. tostring(chEndTimeMS)
+        local startMS = ToNumber(chStartTimeMS)
+        local endMS = ToNumber(chEndTimeMS)
 
-        if frame.__HRUI_TargetCastKey ~= castKey then
-            frame.__HRUI_TargetCastKey = castKey
+        if frame.__HRUI_TargetCastType ~= 2
+            or frame.__HRUI_TargetCastStartMS ~= startMS
+            or frame.__HRUI_TargetCastEndMS ~= endMS then
+            frame.__HRUI_TargetCastType = 2
+            frame.__HRUI_TargetCastStartMS = startMS
+            frame.__HRUI_TargetCastEndMS = endMS
+
             ns:StartCastbarChannel(frame, chName, chTexture, chStartTimeMS, chEndTimeMS, chNotInterruptible)
         end
+
         return
     end
 
-    frame.__HRUI_TargetCastKey = nil
-    ns:ResetCastbar(frame)
+    ResetTargetCastbar(frame)
 end
 
 function ns:SpawnTargetCastbar()
@@ -132,8 +166,7 @@ function ns:SpawnTargetCastbar()
         end
 
         if stopEvents[event] then
-            self.__HRUI_TargetCastKey = nil
-            ns:ResetCastbar(self)
+            ResetTargetCastbar(self)
             return
         end
 
