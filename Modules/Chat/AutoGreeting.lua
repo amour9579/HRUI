@@ -87,6 +87,7 @@ local function GetGreetingDelay()
 
     return delay
 end
+
 local function TrimMessage(message)
     if type(message) ~= "string" then
         return ""
