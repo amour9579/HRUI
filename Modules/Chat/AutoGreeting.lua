@@ -15,8 +15,8 @@ local EVENT_PREFIX = "AutoGreeting_"
 local DEFAULT_JOIN_MESSAGE = "안녕 하세요"
 local DEFAULT_CHALLENGE_COMPLETED_MESSAGE = "수고 하셨습니다"
 local DEFAULT_SUMMON_MESSAGE = "감사 합니다"
-
 local DEFAULT_LEADER_JOIN_MESSAGE = "어서 오세요"
+local DEFAULT_GREETING_DELAY = 2
 
 local function GetDB()
     ns.db.profile.chat = ns.db.profile.chat or {}
@@ -70,9 +70,23 @@ local function GetDB()
         db.leaderJoinMessage = DEFAULT_LEADER_JOIN_MESSAGE
     end
 
+    if db.delay == nil then
+        db.delay = DEFAULT_GREETING_DELAY
+    end
+
+    db.delay = tonumber(db.delay) or DEFAULT_GREETING_DELAY
     return db
 end
 
+local function GetGreetingDelay()
+    local delay = tonumber(GetDB().delay) or DEFAULT_GREETING_DELAY
+
+    if delay < 0 then
+        return 0
+    end
+
+    return delay
+end
 local function TrimMessage(message)
     if type(message) ~= "string" then
         return ""
@@ -170,7 +184,7 @@ function AutoGreeting:ScheduleJoinGreeting()
 
     self:CancelJoinTimer()
 
-    self.pendingJoinTimer = C_Timer.NewTimer(2, function()
+    self.pendingJoinTimer = C_Timer.NewTimer(GetGreetingDelay(), function()
         self.pendingJoinTimer = nil
 
         local channel = self:GetGroupChannel()
@@ -190,7 +204,7 @@ function AutoGreeting:ScheduleChallengeCompletedGreeting()
 
     self:CancelCompletionTimer()
 
-    self.pendingCompletionTimer = C_Timer.NewTimer(2, function()
+    self.pendingCompletionTimer = C_Timer.NewTimer(GetGreetingDelay(), function()
         self.pendingCompletionTimer = nil
 
         local channel = self:GetGroupChannel()
@@ -210,7 +224,7 @@ function AutoGreeting:ScheduleSummonGreeting()
 
     self:CancelSummonTimer()
 
-    self.pendingSummonTimer = C_Timer.NewTimer(2, function()
+    self.pendingSummonTimer = C_Timer.NewTimer(GetGreetingDelay(), function()
         self.pendingSummonTimer = nil
 
         local channel = self:GetSummonChannel()
@@ -228,7 +242,7 @@ function AutoGreeting:ScheduleLeaderJoinGreeting()
         return
     end
 
-    self.pendingLeaderJoinTimer = C_Timer.NewTimer(1, function()
+    self.pendingLeaderJoinTimer = C_Timer.NewTimer(GetGreetingDelay(), function()
         self.pendingLeaderJoinTimer = nil
         local timerDB = GetDB()
 
