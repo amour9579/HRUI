@@ -30,6 +30,21 @@ local startEvents = {
     UNIT_SPELLCAST_CHANNEL_UPDATE = true,
 }
 
+local INTERRUPT_SPELLS_BY_CLASS = {
+    DEATHKNIGHT = { 47528 },            -- Mind Freeze
+    DEMONHUNTER = { 183752 },           -- Disrupt
+    DRUID = { 106839, 78675 },          -- Skull Bash, Solar Beam
+    EVOKER = { 351338 },                -- Quell
+    HUNTER = { 147362, 187707 },        -- Counter Shot, Muzzle
+    MAGE = { 2139 },                    -- Counterspell
+    MONK = { 116705 },                  -- Spear Hand Strike
+    PALADIN = { 96231 },                -- Rebuke
+    PRIEST = { 15487 },                 -- Silence
+    ROGUE = { 1766 },                   -- Kick
+    SHAMAN = { 57994 },                 -- Wind Shear
+    WARLOCK = { 19647, 132409, 89766 }, -- Spell Lock, Command Demon, Axe Toss
+    WARRIOR = { 6552 },                 -- Pummel
+}
 local function GetTargetCastbarStyle()
     local style = ns.db
         and ns.db.profile
@@ -43,17 +58,122 @@ local function GetTargetCastbarStyle()
     }
 end
 
-local function SafeBoolean(value)
-    local ok, result = pcall(function()
-        if value then
+local function IsSpellKnownByPlayer(spellID)
+    if C_Spell and C_Spell.IsSpellKnown then
+        local ok, known = pcall(C_Spell.IsSpellKnown, spellID)
+        if ok and known then
             return true
         end
+    end
 
+    if IsPlayerSpell then
+        local ok, known = pcall(IsPlayerSpell, spellID)
+        if ok and known then
+            return true
+        end
+    end
+
+    return false
+end
+
+local function GetSpellCooldownValues(spellID)
+    if C_Spell and C_Spell.GetSpellCooldown then
+        local ok, info = pcall(C_Spell.GetSpellCooldown, spellID)
+        if ok and info then
+            return info.startTime or 0, info.duration or 0, info.isEnabled
+        end
+    end
+
+    if GetSpellCooldown then
+        local ok, startTime, duration, isEnabled = pcall(GetSpellCooldown, spellID)
+        if ok then
+            return startTime or 0, duration or 0, isEnabled
+        end
+    end
+
+    return 0, 0, true
+end
+
+local function SpellHasReadyCharge(spellID)
+    if not C_Spell or not C_Spell.GetSpellCharges then
         return false
-    end)
+    end
+
+    local ok, info = pcall(C_Spell.GetSpellCharges, spellID)
+    if not ok or not info then
+        return false
+    end
+
+    return (info.currentCharges or 0) > 0
+end
+
+local function IsPlayerInterruptReady()
+    local _, class = UnitClass("player")
+    local spells = class and INTERRUPT_SPELLS_BY_CLASS[class]
+
+    if not spells then
+        return true
+    end
+
+    local hasKnownInterrupt = false
+
+    for _, spellID in ipairs(spells) do
+        if IsSpellKnownByPlayer(spellID) then
+            hasKnownInterrupt = true
+
+            if SpellHasReadyCharge(spellID) then
+                return true
+            end
+
+            local startTime, duration, isEnabled = GetSpellCooldownValues(spellID)
+
+            if isEnabled ~= false and ((startTime or 0) == 0 or (duration or 0) == 0) then
+                return true
+            end
+        end
+    end
+
+    if not hasKnownInterrupt then
+        return true
+    end
+
+    return false
+end
+
+local function SetTargetCastbarColor(frame, color)
+    if not frame or not color then
+        return
+    end
+
+    local r = color[1] or 1
+    local g = color[2] or 1
+    local b = color[3] or 1
+    local a = color[4] or 1
+
+    if frame.SetStatusBarColor then
+        frame:SetStatusBarColor(r, g, b, a)
+    end
+
+    local texture = frame.GetStatusBarTexture and frame:GetStatusBarTexture()
+    if texture and texture.SetVertexColor then
+        texture:SetVertexColor(r, g, b, a)
+    end
+end
+
+local function EvaluateBooleanColor(secretBoolean, trueValue, falseValue)
+    if not C_CurveUtil or not C_CurveUtil.EvaluateColorValueFromBoolean then
+        return nil
+    end
+
+    local ok, value = pcall(
+        C_CurveUtil.EvaluateColorValueFromBoolean,
+        secretBoolean,
+        trueValue,
+        falseValue
+    )
 
     if ok then
-        return result
+        return value
     end
 
     return nil
@@ -65,23 +185,38 @@ local function ApplyTargetCastbarColor(frame, isChannel, notInterruptible)
     end
 
     local style = GetTargetCastbarStyle()
-    local safeNotInterruptible = SafeBoolean(notInterruptible)
+    local baseColor = isChannel and style.channel or style.cast
+    local noInterruptColor = style.nonInterruptible
 
-    if safeNotInterruptible == true then
-        frame:SetStatusBarColor(unpack(style.nonInterruptible))
-    elseif isChannel then
-        frame:SetStatusBarColor(unpack(style.channel))
-    else
-        frame:SetStatusBarColor(unpack(style.cast))
+    -- Plater식 처리:
+    -- 실제로 차단 가능한 주문이어도 내 차단기가 쿨이면 차단 불가능 색상으로 표시.
+    if not IsPlayerInterruptReady() then
+        SetTargetCastbarColor(frame, noInterruptColor)
+        return
     end
 
-    frame.notInterruptible = safeNotInterruptible == true
+    -- Retail 12.x secret boolean 대응.
+    -- notInterruptible을 if/not/== 로 직접 판단하면 taint error가 날 수 있으므로
+    -- C_CurveUtil.EvaluateColorValueFromBoolean에 그대로 넘긴다.
+    local r = EvaluateBooleanColor(notInterruptible, noInterruptColor[1], baseColor[1])
+    local g = EvaluateBooleanColor(notInterruptible, noInterruptColor[2], baseColor[2])
+    local b = EvaluateBooleanColor(notInterruptible, noInterruptColor[3], baseColor[3])
+    local a = EvaluateBooleanColor(notInterruptible, noInterruptColor[4] or 1, baseColor[4] or 1)
+
+    if r ~= nil and g ~= nil and b ~= nil and a ~= nil then
+        SetTargetCastbarColor(frame, { r, g, b, a })
+        return
+    end
+
+    SetTargetCastbarColor(frame, baseColor)
 end
+
 local function ResetTargetCastbar(frame)
     if frame then
         frame.__HRUI_TestCastbar = nil
         frame.__HRUI_TargetTimerActive = nil
         frame.__HRUI_TargetTimerKind = nil
+        frame.__HRUI_TargetLastNotInterruptible = nil
     end
 
     ns:ResetCastbar(frame)
@@ -90,6 +225,7 @@ end
 function ns:ResetTargetCastbar(frame)
     ResetTargetCastbar(frame or ns.TargetCastbar)
 end
+
 local function SafeSetText(fontString, text)
     if not fontString then
         return
@@ -117,18 +253,21 @@ local function SafeSetFormattedTime(fontString, value)
         return
     end
 
-    local ok = pcall(fontString.SetFormattedText, fontString, "%.1f", value or 0)
+    local ok = pcall(fontString.SetFormattedText, fontString, "%.1f", value)
     if not ok then
         fontString:SetText("")
     end
 end
 
-local function GetDuration(durationFunc, unit)
+local function GetDurationCopy(durationFunc, unit)
     if type(durationFunc) ~= "function" then
         return nil
     end
 
-    local ok, duration = pcall(durationFunc, unit)
+    local ok, duration = pcall(function()
+        local d = durationFunc(unit)
+        return d:Copy()
+    end)
     if ok then
         return duration
     end
@@ -141,12 +280,11 @@ local function StartTargetTimer(frame, spellName, icon, duration, isChannel, not
         return false
     end
 
-    frame.__HRUI_TestCastbar = nil
-    local style = GetTargetCastbarStyle()
     local direction = isChannel
         and StatusBarTimerDirection.RemainingTime
         or StatusBarTimerDirection.ElapsedTime
 
+    frame.__HRUI_TestCastbar = nil
     frame.casting = nil
     frame.channeling = nil
     frame.startTime = nil
@@ -155,6 +293,7 @@ local function StartTargetTimer(frame, spellName, icon, duration, isChannel, not
 
     frame.__HRUI_TargetTimerActive = true
     frame.__HRUI_TargetTimerKind = isChannel and "channel" or "cast"
+    frame.__HRUI_TargetLastNotInterruptible = notInterruptible
 
     frame:SetTimerDuration(
         duration,
@@ -191,24 +330,16 @@ local function StartTargetCastbarFromUnit(frame, unit)
     if not frame or not unit or not UnitExists(unit) then
         return false
     end
-    local name, _, texture, _, _, _, _, notInterruptible = UnitCastingInfo(unit)
-    if name then
-        local duration = GetDuration(UnitCastingDuration, unit)
-        if duration then
-            return StartTargetTimer(frame, name, texture, duration, false, notInterruptible)
-        end
-
-        return false
+    local castDuration = GetDurationCopy(UnitCastingDuration, unit)
+    if castDuration then
+        local name, _, texture, _, _, _, _, notInterruptible = UnitCastingInfo(unit)
+        return StartTargetTimer(frame, name, texture, castDuration, false, notInterruptible)
     end
 
-    local chName, _, chTexture, _, _, _, chNotInterruptible = UnitChannelInfo(unit)
-    if chName then
-        local duration = GetDuration(UnitChannelDuration, unit)
-        if duration then
-            return StartTargetTimer(frame, chName, chTexture, duration, true, chNotInterruptible)
-        end
-
-        return false
+    local channelDuration = GetDurationCopy(UnitChannelDuration, unit)
+    if channelDuration then
+        local chName, _, chTexture, _, _, _, chNotInterruptible = UnitChannelInfo(unit)
+        return StartTargetTimer(frame, chName, chTexture, channelDuration, true, chNotInterruptible)
     end
 
     return false
@@ -279,12 +410,12 @@ function ns:SpawnTargetCastbar()
     frame:Hide()
 
     frame:SetScript("OnUpdate", function(self)
-        local db = ns.db
+        local targetDB = ns.db
             and ns.db.profile
             and ns.db.profile.castbars
             and ns.db.profile.castbars.target
 
-        if not db or not db.enabled then
+        if not targetDB or not targetDB.enabled then
             ResetTargetCastbar(self)
             return
         end
@@ -298,7 +429,15 @@ function ns:SpawnTargetCastbar()
 
             return
         end
+
         UpdateTargetTimeText(self)
+        if self.__HRUI_TargetTimerActive then
+            ApplyTargetCastbarColor(
+                self,
+                self.__HRUI_TargetTimerKind == "channel",
+                self.__HRUI_TargetLastNotInterruptible
+            )
+        end
     end)
 
     frame:RegisterEvent("PLAYER_TARGET_CHANGED")
@@ -311,7 +450,6 @@ function ns:SpawnTargetCastbar()
     frame:SetScript("OnEvent", function(self, event, unit)
         if event == "PLAYER_TARGET_CHANGED" or event == "PLAYER_ENTERING_WORLD" then
             ResetTargetCastbar(self)
-
             ForceUpdateTargetCastbar(self)
 
             if C_Timer and C_Timer.After then
@@ -333,14 +471,27 @@ function ns:SpawnTargetCastbar()
         end
 
         if event == "UNIT_SPELLCAST_NOT_INTERRUPTIBLE" then
-            ApplyTargetCastbarColor(self, self.__HRUI_TargetTimerKind == "channel", true)
+            self.__HRUI_TargetLastNotInterruptible = true
+
+            ApplyTargetCastbarColor(
+                self,
+                self.__HRUI_TargetTimerKind == "channel",
+                true
+            )
             return
         end
 
         if event == "UNIT_SPELLCAST_INTERRUPTIBLE" then
-            ApplyTargetCastbarColor(self, self.__HRUI_TargetTimerKind == "channel", false)
+            self.__HRUI_TargetLastNotInterruptible = false
+
+            ApplyTargetCastbarColor(
+                self,
+                self.__HRUI_TargetTimerKind == "channel",
+                false
+            )
             return
         end
+
         if startEvents[event] then
             if not StartTargetCastbarFromUnit(self, "target") then
                 ResetTargetCastbar(self)
