@@ -88,7 +88,9 @@ local function CreateCastbarGroup(unit, label)
                 name = "테스트 표시",
                 order = 7,
                 func = function()
+                    local db = ns:GetCastbarDB(unit)
                     local frame
+
                     if unit == "player" then
                         frame = ns.PlayerCastbar
                     elseif unit == "target" then
@@ -97,9 +99,48 @@ local function CreateCastbarGroup(unit, label)
                         frame = ns.PetCastbar
                     end
 
-                    if frame then
-                        local now = GetTime()
-                        ns:StartCastbarCast(frame, "Test Spell", 136243, now * 1000, (now + 10) * 1000, false)
+                    if not frame then
+                        return
+                    end
+
+                    if not db or not db.enabled then
+                        if unit == "target" and ns.ResetTargetCastbar then
+                            ns:ResetTargetCastbar(frame)
+                        else
+                            ns:ResetCastbar(frame)
+                        end
+
+                        return
+                    end
+
+                    if unit == "target" then
+                        frame.__HRUI_TestCastbar = true
+                    end
+
+                    local now = GetTime()
+
+                    ns:ResetCastbar(frame)
+                    ns:StartCastbarCast(frame, "Test Spell", 136243, now * 1000, (now + 10) * 1000, false)
+
+                    if C_Timer and C_Timer.After then
+                        C_Timer.After(10.05, function()
+                            if not frame then
+                                return
+                            end
+
+                            if unit == "target" then
+                                if frame.__HRUI_TestCastbar then
+                                    if ns.ResetTargetCastbar then
+                                        ns:ResetTargetCastbar(frame)
+                                    else
+                                        frame.__HRUI_TestCastbar = nil
+                                        ns:ResetCastbar(frame)
+                                    end
+                                end
+                            else
+                                ns:ResetCastbar(frame)
+                            end
+                        end)
                     end
                 end,
             },
