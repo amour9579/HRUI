@@ -43,6 +43,38 @@ local function GetPartyResumeDB()
     return db.partyResume
 end
 
+local function IsPartyResumeEnabled()
+    local db = GetPartyResumeDB()
+
+    if db.enabled == nil then
+        db.enabled = true
+    end
+
+    return db.enabled
+end
+
+local function SetPartyResumeEnabled(value)
+    GetPartyResumeDB().enabled = value
+    NotifyConfigChanged()
+end
+
+local function IsPartyResumeManual()
+    return GetPartyResumeDB().manual == true
+end
+
+local function SetPartyResumeManual(value)
+    GetPartyResumeDB().manual = value
+    NotifyConfigChanged()
+end
+
+local function GetPartyResumeManualMessage()
+    return GetPartyResumeDB().manualMessage or ""
+end
+
+local function SetPartyResumeManualMessage(value)
+    GetPartyResumeDB().manualMessage = value or ""
+    NotifyConfigChanged()
+end
 local function GetPartyResumeFields()
     return GetPartyResumeDB().fields
 end
@@ -167,17 +199,30 @@ function ns:CreateKeystoneReporter()
                 args = {
                     resumeNotice = {
                         type = "description",
-                        name = "|cffffff00※ 참가 신청 창이 열리면 완성된 서식을 선택할 수 있는 보조창이 표시됩니다. Ctrl+C 후 쪽지 칸에 Ctrl+V 하세요.|r",
+                        name = "|cffffff00※ 자동입력은 WoW 보안 제한 때문에 불가능합니다. 보조창에서 Ctrl+C 후 신청 쪽지 칸에 Ctrl+V 하세요.|r",
                         order = 1,
                         width = "full",
                     },
 
+                    enabled = {
+                        type = "toggle",
+                        name = "파티 이력서 사용",
+                        desc = "파티 참가 신청 창이 열릴 때 파티 이력서 보조창을 표시합니다.",
+                        order = 2,
+                        width = "full",
+                        get = IsPartyResumeEnabled,
+                        set = function(_, value)
+                            SetPartyResumeEnabled(value)
+                        end,
+                    },
+
+                    powerHeader = { type = "header", name = "자동 서식", order = 3 },
                     showSpec = {
                         type = "toggle",
                         name = "전문화",
                         desc = "이력서에 현재 전문화를 포함합니다.",
                         width = "half",
-                        order = 2,
+                        order = 3.1,
                         get = function()
                             return GetPartyResumeFieldValue("showSpec")
                         end,
@@ -191,7 +236,7 @@ function ns:CreateKeystoneReporter()
                         name = "템렙",
                         desc = "이력서에 현재 착용 아이템 레벨을 포함합니다.",
                         width = "half",
-                        order = 3,
+                        order = 3.2,
                         get = function()
                             return GetPartyResumeFieldValue("showItemLevel")
                         end,
@@ -205,7 +250,7 @@ function ns:CreateKeystoneReporter()
                         name = "셋템보유",
                         desc = "이력서에 현재 전문화 기준 셋템 착용 개수를 포함합니다.",
                         width = "half",
-                        order = 4,
+                        order = 3.3,
                         get = function()
                             return GetPartyResumeFieldValue("showTierSet")
                         end,
@@ -221,7 +266,7 @@ function ns:CreateKeystoneReporter()
                         values = embellishmentCountValues,
                         style = "dropdown",
                         width = "half",
-                        order = 5,
+                        order = 3.4,
                         get = function()
                             return tostring(GetPartyResumeFieldValue("embellishmentCount"))
                         end,
@@ -230,6 +275,35 @@ function ns:CreateKeystoneReporter()
                         end,
                     },
 
+                    powerHeader1 = { type = "header", name = "수동 서식", order = 4 },
+
+                    manual = {
+                        type = "toggle",
+                        name = "수동입력 사용",
+                        desc = "체크하면 자동 서식 대신 직접 입력한 메시지를 사용합니다.",
+                        order = 4.1,
+                        width = "full",
+                        get = IsPartyResumeManual,
+                        set = function(_, value)
+                            SetPartyResumeManual(value)
+                        end,
+                    },
+
+                    manualMessage = {
+                        type = "input",
+                        name = "수동 메시지",
+                        desc = "수동입력 사용 시 파티 이력서에 표시할 문구입니다.",
+                        order = 4.2,
+                        width = "full",
+                        multiline = true,
+                        get = GetPartyResumeManualMessage,
+                        set = function(_, value)
+                            SetPartyResumeManualMessage(value)
+                        end,
+                        disabled = function()
+                            return not IsPartyResumeManual()
+                        end,
+                    },
                     preview = {
                         type = "input",
                         name = "완성된 서식",
