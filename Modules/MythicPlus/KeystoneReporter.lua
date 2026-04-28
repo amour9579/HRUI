@@ -294,6 +294,201 @@ local function GetCurrentDungeonScore()
     return 0
 end
 
+local function GetPartyResumeFields()
+    if not ns.db or not ns.db.profile then
+        return nil
+    end
+
+    local reporter = ns.db.profile.mythicPlusReporter
+    if not reporter then
+        return nil
+    end
+
+    reporter.partyResume = reporter.partyResume or {}
+    reporter.partyResume.fields = reporter.partyResume.fields or {}
+
+    return reporter.partyResume.fields
+end
+
+local function IsPartyResumeFieldEnabled(key)
+    local fields = GetPartyResumeFields()
+
+    if not fields then
+        return true
+    end
+
+    if fields[key] == nil then
+        return true
+    end
+
+    return fields[key]
+end
+
+local function GetCurrentSpecIDAndName()
+    local fallbackName = "캐릭터"
+
+    if not GetSpecialization or not GetSpecializationInfo then
+        return nil, fallbackName
+    end
+
+    local specIndex = GetSpecialization()
+
+    if specIndex and specIndex > 0 then
+        local specID, specName = GetSpecializationInfo(specIndex)
+        if specName and specName ~= "" then
+            return specID, specName
+        end
+    end
+
+    return nil, fallbackName
+end
+
+local function GetCurrentEquippedItemLevelNumber()
+    local _, equippedLvl = GetAverageItemLevel()
+
+    equippedLvl = tonumber(equippedLvl) or 0
+
+    return math.floor(equippedLvl + 0.5)
+end
+
+local TIER_SLOTS = {
+    1,  -- 머리
+    3,  -- 어깨
+    5,  -- 가슴
+    7,  -- 다리
+    10, -- 손
+}
+
+local function GetEquippedItemID(slot)
+    local link = GetInventoryItemLink("player", slot)
+
+    if not link then
+        return nil
+    end
+
+    if GetItemInfoInstant then
+        local itemID = GetItemInfoInstant(link)
+        return itemID
+    end
+
+    return nil
+end
+
+local function GetTierSetCount()
+    local specID = select(1, GetCurrentSpecIDAndName())
+
+    if not specID then
+        return 0
+    end
+
+    local count = 0
+
+    for _, slot in ipairs(TIER_SLOTS) do
+        local itemID = GetEquippedItemID(slot)
+
+        if itemID then
+            local bonuses
+
+            if C_Item and C_Item.GetSetBonusesForSpecializationByItemID then
+                bonuses = C_Item.GetSetBonusesForSpecializationByItemID(specID, itemID)
+            elseif GetSetBonusesForSpecializationByItemID then
+                bonuses = GetSetBonusesForSpecializationByItemID(specID, itemID)
+            end
+
+            if bonuses and #bonuses > 0 then
+                count = count + 1
+            end
+        end
+    end
+
+    return count
+end
+
+local EMBELLISHMENT_SCAN_SLOTS = {
+    1, 2, 3, 5, 6, 7, 8, 9, 10,
+    11, 12, 13, 14, 15, 16, 17,
+}
+
+local embellishmentTooltip
+
+local function GetEmbellishmentTooltip()
+    if embellishmentTooltip then
+        return embellishmentTooltip
+    end
+
+    embellishmentTooltip = CreateFrame("GameTooltip", "HRUIPartyResumeEmbellishmentTooltip", nil, "GameTooltipTemplate")
+    embellishmentTooltip:SetOwner(UIParent, "ANCHOR_NONE")
+
+    return embellishmentTooltip
+end
+
+local function IsEquippedItemEmbellished(slot)
+    local link = GetInventoryItemLink("player", slot)
+
+    if not link then
+        return false
+    end
+
+    local tooltip = GetEmbellishmentTooltip()
+    tooltip:ClearLines()
+    tooltip:SetInventoryItem("player", slot)
+
+    for i = 1, tooltip:NumLines() do
+        local line = _G["HRUIPartyResumeEmbellishmentTooltipTextLeft" .. i]
+        local text = line and line:GetText()
+
+        if text and (
+                text:find("장식", 1, true)
+                or text:find("Embellished", 1, true)
+                or text:find("Embellishment", 1, true)
+            ) then
+            return true
+        end
+    end
+
+    return false
+end
+
+local function GetEmbellishmentCount()
+    local count = 0
+
+    for _, slot in ipairs(EMBELLISHMENT_SCAN_SLOTS) do
+        if IsEquippedItemEmbellished(slot) then
+            count = count + 1
+        end
+    end
+
+    return count
+end
+
+function M:BuildPartyResumeMessage()
+    local _, specName = GetCurrentSpecIDAndName()
+    local parts = {}
+
+    if IsPartyResumeFieldEnabled("showItemLevel") then
+        tinsert(parts, tostring(GetCurrentEquippedItemLevelNumber()))
+    end
+
+    if IsPartyResumeFieldEnabled("showTierSet") then
+        tinsert(parts, tostring(GetTierSetCount()))
+    end
+
+    if IsPartyResumeFieldEnabled("showEmbellishment") then
+        tinsert(parts, tostring(GetEmbellishmentCount()))
+    end
+
+    local prefix = table.concat(parts, " / ")
+
+    if IsPartyResumeFieldEnabled("showSpec") then
+        if prefix ~= "" then
+            return format("%s %s입니다.", prefix, specName)
+        end
+
+        return format("%s입니다.", specName)
+    end
+
+    return prefix
+end
 function M:BuildReportMessage(reportType, isEnglish)
     if reportType == "돌" then
         local keystone = self:GetMyKeystone()
@@ -512,6 +707,126 @@ function M:UnregisterEvents()
     self:CancelPendingResponse()
 end
 
+M.partyResumeDialogHooked = false
+M.partyResumeHelperFrame = nil
+
+function M:GetPartyResumeHelperFrame()
+    if self.partyResumeHelperFrame then
+        return self.partyResumeHelperFrame
+    end
+
+    local frame = CreateFrame("Frame", "HRUIPartyResumeHelperFrame", UIParent,
+        BackdropTemplateMixin and "BackdropTemplate")
+    frame:SetSize(430, 82)
+    frame:SetFrameStrata("DIALOG")
+    frame:SetMovable(true)
+    frame:EnableMouse(true)
+    frame:RegisterForDrag("LeftButton")
+    frame:SetScript("OnDragStart", frame.StartMoving)
+    frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
+    frame:Hide()
+
+    if frame.SetBackdrop then
+        frame:SetBackdrop({
+            bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
+            edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+            tile = true,
+            tileSize = 32,
+            edgeSize = 32,
+            insets = { left = 8, right = 8, top = 8, bottom = 8 },
+        })
+    end
+
+    frame.label = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    frame.label:SetPoint("TOPLEFT", 16, -14)
+    frame.label:SetText("파티 이력서: Ctrl+C 후 신청 쪽지 칸에 Ctrl+V")
+
+    frame.edit = CreateFrame("EditBox", nil, frame, "InputBoxTemplate")
+    frame.edit:SetAutoFocus(false)
+    frame.edit:SetSize(320, 24)
+    frame.edit:SetPoint("TOPLEFT", frame.label, "BOTTOMLEFT", 0, -8)
+    frame.edit:SetFontObject(ChatFontNormal)
+    frame.edit:SetScript("OnEscapePressed", function(self)
+        self:ClearFocus()
+        frame:Hide()
+    end)
+    frame.edit:SetScript("OnEditFocusGained", function(self)
+        self:HighlightText()
+    end)
+    frame.edit:SetScript("OnMouseUp", function(self)
+        self:HighlightText()
+    end)
+
+    frame.select = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+    frame.select:SetSize(58, 24)
+    frame.select:SetPoint("LEFT", frame.edit, "RIGHT", 8, 0)
+    frame.select:SetText("선택")
+    frame.select:SetScript("OnClick", function()
+        frame.edit:SetText(M:BuildPartyResumeMessage())
+        frame.edit:SetFocus()
+        frame.edit:HighlightText()
+        print("|cff00ff00HRUI|r Ctrl+C로 복사한 뒤 신청 쪽지 칸에 Ctrl+V 하세요.")
+    end)
+
+    frame.close = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
+    frame.close:SetPoint("TOPRIGHT", -4, -4)
+
+    self.partyResumeHelperFrame = frame
+
+    return frame
+end
+
+function M:ShowPartyResumeHelper()
+    local frame = self:GetPartyResumeHelperFrame()
+
+    frame.edit:SetText(self:BuildPartyResumeMessage())
+
+    frame:ClearAllPoints()
+
+    if LFGListApplicationDialog and LFGListApplicationDialog:IsShown() then
+        frame:SetPoint("BOTTOM", LFGListApplicationDialog, "TOP", 0, 8)
+    else
+        frame:SetPoint("CENTER", UIParent, "CENTER", 0, 180)
+    end
+
+    frame:Show()
+    frame.edit:SetFocus()
+    frame.edit:HighlightText()
+end
+
+function M:HookPartyResumeDialog()
+    if self.partyResumeDialogHooked then
+        return
+    end
+
+    if not LFGListApplicationDialog then
+        return
+    end
+
+    LFGListApplicationDialog:HookScript("OnShow", function()
+        C_Timer.After(0, function()
+            M:ShowPartyResumeHelper()
+        end)
+    end)
+
+    LFGListApplicationDialog:HookScript("OnHide", function()
+        local frame = M.partyResumeHelperFrame
+        if frame then
+            frame:Hide()
+        end
+    end)
+
+    self.partyResumeDialogHooked = true
+end
+
+local partyResumeEventFrame = CreateFrame("Frame")
+partyResumeEventFrame:RegisterEvent("PLAYER_LOGIN")
+partyResumeEventFrame:RegisterEvent("ADDON_LOADED")
+partyResumeEventFrame:SetScript("OnEvent", function(_, event, addonName)
+    if event == "PLAYER_LOGIN" or addonName == "Blizzard_GroupFinder" then
+        M:HookPartyResumeDialog()
+    end
+end)
 function M:Initialize()
     self:UnregisterEvents()
 
