@@ -195,6 +195,14 @@ ns.Defaults = {
                 showItemLevel = true,
                 showScore = true,
             },
+            partyResume = {
+                fields = {
+                    showSpec = true,
+                    showItemLevel = true,
+                    showTierSet = true,
+                    showEmbellishment = true,
+                },
+            },
         },
 
         dice = {
