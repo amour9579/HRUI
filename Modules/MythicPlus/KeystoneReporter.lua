@@ -470,11 +470,17 @@ function M:BuildPartyResumeMessage()
     end
 
     if IsPartyResumeFieldEnabled("showTierSet") then
-        tinsert(parts, tostring(GetTierSetCount()))
+        local tierSetCount = GetTierSetCount()
+        if tierSetCount > 0 then
+            tinsert(parts, tostring(tierSetCount))
+        end
     end
 
     if IsPartyResumeFieldEnabled("showEmbellishment") then
-        tinsert(parts, tostring(GetEmbellishmentCount()))
+        local embellishmentCount = GetEmbellishmentCount()
+        if embellishmentCount > 0 then
+            tinsert(parts, tostring(embellishmentCount))
+        end
     end
 
     local prefix = table.concat(parts, " / ")
@@ -489,6 +495,7 @@ function M:BuildPartyResumeMessage()
 
     return prefix
 end
+
 function M:BuildReportMessage(reportType, isEnglish)
     if reportType == "돌" then
         local keystone = self:GetMyKeystone()
