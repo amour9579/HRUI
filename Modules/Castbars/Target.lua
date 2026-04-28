@@ -46,6 +46,7 @@ end
 
 local function ResetTargetCastbar(frame)
     if frame then
+        frame.__HRUI_TestCastbar = nil
         frame.__HRUI_TargetTimerActive = nil
         frame.__HRUI_TargetTimerKind = nil
     end
@@ -53,6 +54,9 @@ local function ResetTargetCastbar(frame)
     ns:ResetCastbar(frame)
 end
 
+function ns:ResetTargetCastbar(frame)
+    ResetTargetCastbar(frame or ns.TargetCastbar)
+end
 local function SafeSetText(fontString, text)
     if not fontString then
         return
@@ -104,6 +108,7 @@ local function StartTargetTimer(frame, spellName, icon, duration, isChannel)
         return false
     end
 
+    frame.__HRUI_TestCastbar = nil
     local style = GetTargetCastbarStyle()
     local direction = isChannel
         and StatusBarTimerDirection.RemainingTime
@@ -244,6 +249,25 @@ function ns:SpawnTargetCastbar()
     frame:Hide()
 
     frame:SetScript("OnUpdate", function(self)
+        local db = ns.db
+            and ns.db.profile
+            and ns.db.profile.castbars
+            and ns.db.profile.castbars.target
+
+        if not db or not db.enabled then
+            ResetTargetCastbar(self)
+            return
+        end
+
+        if self.__HRUI_TestCastbar then
+            ns:UpdateCastbar(self)
+
+            if not self.casting and not self.channeling then
+                self.__HRUI_TestCastbar = nil
+            end
+
+            return
+        end
         UpdateTargetTimeText(self)
     end)
 
