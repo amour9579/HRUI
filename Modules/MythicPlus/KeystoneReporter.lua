@@ -9,6 +9,8 @@ M.pendingEng = nil
 M.enabled = true
 M.pendingResponseTimer = nil
 M.suppressNextOwnCommand = nil
+M.weeklyRunHistory = nil
+M.weeklyRunHistoryReady = false
 
 local strfind = string.find
 local format = string.format
@@ -239,13 +241,76 @@ function M:GetMyKeystone()
     return "쐐기돌 없음"
 end
 
+local function CopyRunHistory(runHistory)
+    local copied = {}
+
+    if type(runHistory) ~= "table" then
+        return copied
+    end
+
+    for i, run in ipairs(runHistory) do
+        copied[i] = run
+    end
+
+    return copied
+end
+
+function M:RequestWeeklyDungeonInfoUpdate()
+    if C_MythicPlus and C_MythicPlus.RequestMapInfo then
+        C_MythicPlus.RequestMapInfo()
+    end
+end
+
+function M:RefreshWeeklyDungeonInfoCache()
+    if not C_MythicPlus or not C_MythicPlus.GetRunHistory then
+        return false
+    end
+
+    local runHistory = C_MythicPlus.GetRunHistory(false, true)
+
+    if type(runHistory) ~= "table" then
+        return false
+    end
+
+    self.weeklyRunHistory = CopyRunHistory(runHistory)
+    self.weeklyRunHistoryReady = true
+
+    return true
+end
+
+function M:PrimeWeeklyDungeonInfo()
+    self.weeklyRunHistoryReady = false
+    self:RequestWeeklyDungeonInfoUpdate()
+
+    if C_Timer and C_Timer.After then
+        C_Timer.After(1.5, function()
+            if not M.weeklyRunHistoryReady then
+                M:RefreshWeeklyDungeonInfoCache()
+            end
+        end)
+
+        C_Timer.After(5, function()
+            if not M.weeklyRunHistoryReady then
+                M:RequestWeeklyDungeonInfoUpdate()
+                M:RefreshWeeklyDungeonInfoCache()
+            end
+        end)
+    else
+        self:RefreshWeeklyDungeonInfoCache()
+    end
+end
 function M:GetWeeklyDungeonInfo(isEnglish)
     if not C_MythicPlus or not C_MythicPlus.GetRunHistory then
         return isEnglish and "Weekly: Unavailable" or "주차: 정보 없음"
     end
 
-    local runHistory = C_MythicPlus.GetRunHistory(false, true)
-    local numRuns = (runHistory and #runHistory) or 0
+    if not self.weeklyRunHistoryReady then
+        self:RequestWeeklyDungeonInfoUpdate()
+        return isEnglish and "Weekly: Updating..." or "주차: 정보 갱신 중"
+    end
+
+    local runHistory = CopyRunHistory(self.weeklyRunHistory or C_MythicPlus.GetRunHistory(false, true))
+    local numRuns = #runHistory
 
     if numRuns == 0 then
         return isEnglish and "Weekly: Incomplete" or "주차: 미완료"
@@ -662,6 +727,26 @@ function M:RegisterEvents()
 
     ns.Event:Register("PLAYER_REGEN_ENABLED", "KeystoneReporterRegen", function()
         M:OnRegenEnabled()
+    end)
+    ns.Event:Register("PLAYER_ENTERING_WORLD", "KeystoneReporterWeeklyEnteringWorld",
+        function(_, isInitialLogin, isReloadingUi)
+            if isInitialLogin or isReloadingUi then
+                M:PrimeWeeklyDungeonInfo()
+            else
+                M:RequestWeeklyDungeonInfoUpdate()
+            end
+        end)
+
+    ns.Event:Register("CHALLENGE_MODE_MAPS_UPDATE", "KeystoneReporterWeeklyMapsUpdate", function()
+        M:RefreshWeeklyDungeonInfoCache()
+    end)
+
+    ns.Event:Register("MYTHIC_PLUS_NEW_WEEKLY_RECORD", "KeystoneReporterWeeklyNewRecord", function()
+        M:PrimeWeeklyDungeonInfo()
+    end)
+
+    ns.Event:Register("CHALLENGE_MODE_COMPLETED", "KeystoneReporterWeeklyCompleted", function()
+        M:PrimeWeeklyDungeonInfo()
     end)
 end
 
