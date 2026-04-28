@@ -130,9 +130,9 @@ ns.Defaults = {
             entries = {
                 { enabled = true, trigger = "/rl", action = "/reload" },
                 { enabled = true, trigger = "/기", action = "/reload" },
-                { enabled = false, trigger = "", action = "" },
-                { enabled = false, trigger = "", action = "" },
-                { enabled = false, trigger = "", action = "" },
+                { enabled = true, trigger = "/ao", action = "/매크로" },
+                { enabled = true, trigger = "/월드맵투명도0", action = "/console mapFade 0" },
+                { enabled = true, trigger = "/월드맵투명도1", action = "/console mapFade 1" },
             },
         },
         chat = {
