@@ -882,7 +882,6 @@ end
 
 function M:ShowPartyResumeHelper()
     if not IsPartyResumeEnabled() then
-        print("|cff00ff00HRUI|r 파티 이력서 사용이 꺼져 있습니다.")
         return
     end
     local frame = self:GetPartyResumeHelperFrame()
