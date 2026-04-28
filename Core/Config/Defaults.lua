@@ -196,10 +196,13 @@ ns.Defaults = {
                 showScore = true,
             },
             partyResume = {
+                enabled = true,
+                manual = false,
                 fields = {
                     showSpec = true,
                     showItemLevel = true,
                     showTierSet = true,
+                    embellishmentCount = 2,
                 },
             },
         },
