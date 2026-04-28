@@ -324,6 +324,19 @@ local function IsPartyResumeFieldEnabled(key)
     return fields[key]
 end
 
+local function GetPartyResumeValue(key, defaultValue)
+    local fields = GetPartyResumeFields()
+
+    if not fields then
+        return defaultValue
+    end
+
+    if fields[key] == nil then
+        return defaultValue
+    end
+
+    return fields[key]
+end
 local function GetCurrentSpecIDAndName()
     local fallbackName = "캐릭터"
 
@@ -404,63 +417,6 @@ local function GetTierSetCount()
     return count
 end
 
-local EMBELLISHMENT_SCAN_SLOTS = {
-    1, 2, 3, 5, 6, 7, 8, 9, 10,
-    11, 12, 13, 14, 15, 16, 17,
-}
-
-local embellishmentTooltip
-
-local function GetEmbellishmentTooltip()
-    if embellishmentTooltip then
-        return embellishmentTooltip
-    end
-
-    embellishmentTooltip = CreateFrame("GameTooltip", "HRUIPartyResumeEmbellishmentTooltip", nil, "GameTooltipTemplate")
-    embellishmentTooltip:SetOwner(UIParent, "ANCHOR_NONE")
-
-    return embellishmentTooltip
-end
-
-local function IsEquippedItemEmbellished(slot)
-    local link = GetInventoryItemLink("player", slot)
-
-    if not link then
-        return false
-    end
-
-    local tooltip = GetEmbellishmentTooltip()
-    tooltip:ClearLines()
-    tooltip:SetInventoryItem("player", slot)
-
-    for i = 1, tooltip:NumLines() do
-        local line = _G["HRUIPartyResumeEmbellishmentTooltipTextLeft" .. i]
-        local text = line and line:GetText()
-
-        if text and (
-                text:find("장식", 1, true)
-                or text:find("Embellished", 1, true)
-                or text:find("Embellishment", 1, true)
-            ) then
-            return true
-        end
-    end
-
-    return false
-end
-
-local function GetEmbellishmentCount()
-    local count = 0
-
-    for _, slot in ipairs(EMBELLISHMENT_SCAN_SLOTS) do
-        if IsEquippedItemEmbellished(slot) then
-            count = count + 1
-        end
-    end
-
-    return count
-end
-
 function M:BuildPartyResumeMessage()
     local _, specName = GetCurrentSpecIDAndName()
     local parts = {}
@@ -471,16 +427,19 @@ function M:BuildPartyResumeMessage()
 
     if IsPartyResumeFieldEnabled("showTierSet") then
         local tierSetCount = GetTierSetCount()
+
         if tierSetCount > 0 then
-            tinsert(parts, tostring(tierSetCount))
+            tinsert(parts, format("%d셋", tierSetCount))
         end
     end
 
-    if IsPartyResumeFieldEnabled("showEmbellishment") then
-        local embellishmentCount = GetEmbellishmentCount()
-        if embellishmentCount > 0 then
-            tinsert(parts, tostring(embellishmentCount))
+    local embellishmentCount = tonumber(GetPartyResumeValue("embellishmentCount", 0)) or 0
+
+    if embellishmentCount > 0 then
+        if embellishmentCount > 2 then
+            embellishmentCount = 2
         end
+        tinsert(parts, format("%d장식", embellishmentCount))
     end
 
     local prefix = table.concat(parts, " / ")
