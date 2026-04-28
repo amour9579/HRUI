@@ -200,7 +200,6 @@ ns.Defaults = {
                     showSpec = true,
                     showItemLevel = true,
                     showTierSet = true,
-                    showEmbellishment = true,
                 },
             },
         },
