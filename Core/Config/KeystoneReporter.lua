@@ -315,18 +315,6 @@ function ns:CreateKeystoneReporter()
                             -- 미리보기 전용
                         end,
                     },
-
-                    --[[showHelper = {
-                        type = "execute",
-                        name = "이력서 선택창 열기",
-                        desc = "완성된 서식을 선택 가능한 보조창으로 표시합니다.",
-                        order = 11,
-                        func = function()
-                            if ns.mplus and ns.mplus.ShowPartyResumeHelper then
-                                ns.mplus:ShowPartyResumeHelper()
-                            end
-                        end,
-                    },]]
                 },
             },
         }
