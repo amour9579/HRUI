@@ -1,5 +1,10 @@
 local _, ns = ...
 
+local embellishmentCountValues = {
+    ["0"] = "0 - 생략",
+    ["1"] = "1",
+    ["2"] = "2",
+}
 local function GetKeystoneDB()
     ns.db.profile.mythicPlusReporter = ns.db.profile.mythicPlusReporter or {}
 
@@ -45,15 +50,28 @@ end
 local function GetPartyResumeFieldValue(key)
     local fields = GetPartyResumeFields()
 
-    if fields[key] == nil then
-        return true
+    if key == "showSpec" or key == "showItemLevel" or key == "showTierSet" then
+        if fields[key] == nil then
+            return true
+        end
+
+        return fields[key]
+    end
+
+    if key == "embellishmentCount" then
+        return tonumber(fields[key]) or 0
     end
 
     return fields[key]
 end
-
 local function SetPartyResumeFieldValue(key, value)
-    GetPartyResumeFields()[key] = value
+    local fields = GetPartyResumeFields()
+
+    if key == "embellishmentCount" then
+        fields[key] = tonumber(value) or 0
+    else
+        fields[key] = value
+    end
     NotifyConfigChanged()
 end
 
@@ -196,17 +214,19 @@ function ns:CreateKeystoneReporter()
                         end,
                     },
 
-                    showEmbellishment = {
-                        type = "toggle",
+                    embellishmentCount = {
+                        type = "select",
                         name = "장식보유",
-                        desc = "이력서에 현재 착용 중인 장식 아이템 개수를 포함합니다.",
+                        desc = "이력서에 표시할 장식 보유 개수를 선택합니다. 0이면 생략합니다.",
+                        values = embellishmentCountValues,
+                        style = "dropdown",
                         width = "half",
                         order = 5,
                         get = function()
-                            return GetPartyResumeFieldValue("showEmbellishment")
+                            return tostring(GetPartyResumeFieldValue("embellishmentCount"))
                         end,
                         set = function(_, value)
-                            SetPartyResumeFieldValue("showEmbellishment", value)
+                            SetPartyResumeFieldValue("embellishmentCount", value)
                         end,
                     },
 
@@ -222,7 +242,7 @@ function ns:CreateKeystoneReporter()
                         end,
                     },
 
-                    showHelper = {
+                    --[[showHelper = {
                         type = "execute",
                         name = "이력서 선택창 열기",
                         desc = "완성된 서식을 선택 가능한 보조창으로 표시합니다.",
@@ -232,7 +252,7 @@ function ns:CreateKeystoneReporter()
                                 ns.mplus:ShowPartyResumeHelper()
                             end
                         end,
-                    },
+                    },]]
                 },
             },
         }
