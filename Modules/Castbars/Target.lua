@@ -28,8 +28,6 @@ local startEvents = {
     UNIT_SPELLCAST_DELAYED = true,
     UNIT_SPELLCAST_CHANNEL_START = true,
     UNIT_SPELLCAST_CHANNEL_UPDATE = true,
-    UNIT_SPELLCAST_INTERRUPTIBLE = true,
-    UNIT_SPELLCAST_NOT_INTERRUPTIBLE = true,
 }
 
 local function GetTargetCastbarStyle()
@@ -41,9 +39,44 @@ local function GetTargetCastbarStyle()
     return {
         cast = (style and style.castColor) or { 0.95, 0.75, 0.20 },
         channel = (style and style.channelColor) or { 0.20, 0.70, 1.00 },
+        nonInterruptible = (style and style.nonInterruptibleColor) or { 0.75, 0.20, 0.20 },
     }
 end
 
+local function SafeBoolean(value)
+    local ok, result = pcall(function()
+        if value then
+            return true
+        end
+
+        return false
+    end)
+
+    if ok then
+        return result
+    end
+
+    return nil
+end
+
+local function ApplyTargetCastbarColor(frame, isChannel, notInterruptible)
+    if not frame then
+        return
+    end
+
+    local style = GetTargetCastbarStyle()
+    local safeNotInterruptible = SafeBoolean(notInterruptible)
+
+    if safeNotInterruptible == true then
+        frame:SetStatusBarColor(unpack(style.nonInterruptible))
+    elseif isChannel then
+        frame:SetStatusBarColor(unpack(style.channel))
+    else
+        frame:SetStatusBarColor(unpack(style.cast))
+    end
+
+    frame.notInterruptible = safeNotInterruptible == true
+end
 local function ResetTargetCastbar(frame)
     if frame then
         frame.__HRUI_TestCastbar = nil
@@ -103,7 +136,7 @@ local function GetDuration(durationFunc, unit)
     return nil
 end
 
-local function StartTargetTimer(frame, spellName, icon, duration, isChannel)
+local function StartTargetTimer(frame, spellName, icon, duration, isChannel, notInterruptible)
     if not frame or not duration or not frame.SetTimerDuration then
         return false
     end
@@ -148,11 +181,7 @@ local function StartTargetTimer(frame, spellName, icon, duration, isChannel)
         end
     end
 
-    if isChannel then
-        frame:SetStatusBarColor(unpack(style.channel))
-    else
-        frame:SetStatusBarColor(unpack(style.cast))
-    end
+    ApplyTargetCastbarColor(frame, isChannel, notInterruptible)
 
     frame:Show()
     return true
@@ -162,25 +191,26 @@ local function StartTargetCastbarFromUnit(frame, unit)
     if not frame or not unit or not UnitExists(unit) then
         return false
     end
-    local name, _, texture = UnitCastingInfo(unit)
+    local name, _, texture, _, _, _, _, notInterruptible = UnitCastingInfo(unit)
     if name then
         local duration = GetDuration(UnitCastingDuration, unit)
         if duration then
-            return StartTargetTimer(frame, name, texture, duration, false)
+            return StartTargetTimer(frame, name, texture, duration, false, notInterruptible)
         end
 
         return false
     end
 
-    local chName, _, chTexture = UnitChannelInfo(unit)
+    local chName, _, chTexture, _, _, _, chNotInterruptible = UnitChannelInfo(unit)
     if chName then
         local duration = GetDuration(UnitChannelDuration, unit)
         if duration then
-            return StartTargetTimer(frame, chName, chTexture, duration, true)
+            return StartTargetTimer(frame, chName, chTexture, duration, true, chNotInterruptible)
         end
 
         return false
     end
+
     return false
 end
 
@@ -302,6 +332,15 @@ function ns:SpawnTargetCastbar()
             return
         end
 
+        if event == "UNIT_SPELLCAST_NOT_INTERRUPTIBLE" then
+            ApplyTargetCastbarColor(self, self.__HRUI_TargetTimerKind == "channel", true)
+            return
+        end
+
+        if event == "UNIT_SPELLCAST_INTERRUPTIBLE" then
+            ApplyTargetCastbarColor(self, self.__HRUI_TargetTimerKind == "channel", false)
+            return
+        end
         if startEvents[event] then
             if not StartTargetCastbarFromUnit(self, "target") then
                 ResetTargetCastbar(self)
