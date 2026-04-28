@@ -375,6 +375,55 @@ local function GetPartyResumeFields()
     return reporter.partyResume.fields
 end
 
+local function GetPartyResumeDB()
+    if not ns.db or not ns.db.profile then
+        return nil
+    end
+
+    local reporter = ns.db.profile.mythicPlusReporter
+    if not reporter then
+        return nil
+    end
+
+    reporter.partyResume = reporter.partyResume or {}
+
+    return reporter.partyResume
+end
+
+local function IsPartyResumeEnabled()
+    local db = GetPartyResumeDB()
+
+    if not db then
+        return true
+    end
+
+    if db.enabled == nil then
+        return true
+    end
+
+    return db.enabled
+end
+
+local function IsPartyResumeManual()
+    local db = GetPartyResumeDB()
+
+    return db and db.manual == true
+end
+
+local function GetPartyResumeManualMessage()
+    local db = GetPartyResumeDB()
+
+    if not db then
+        return ""
+    end
+
+    return db.manualMessage or ""
+end
+
+local function TrimText(text)
+    text = tostring(text or "")
+    return text:match("^%s*(.-)%s*$") or ""
+end
 local function IsPartyResumeFieldEnabled(key)
     local fields = GetPartyResumeFields()
 
@@ -483,6 +532,9 @@ local function GetTierSetCount()
 end
 
 function M:BuildPartyResumeMessage()
+    if IsPartyResumeManual() then
+        return TrimText(GetPartyResumeManualMessage())
+    end
     local _, specName = GetCurrentSpecIDAndName()
     local parts = {}
 
@@ -504,6 +556,7 @@ function M:BuildPartyResumeMessage()
         if embellishmentCount > 2 then
             embellishmentCount = 2
         end
+
         tinsert(parts, format("%d장식", embellishmentCount))
     end
 
@@ -828,6 +881,10 @@ function M:GetPartyResumeHelperFrame()
 end
 
 function M:ShowPartyResumeHelper()
+    if not IsPartyResumeEnabled() then
+        print("|cff00ff00HRUI|r 파티 이력서 사용이 꺼져 있습니다.")
+        return
+    end
     local frame = self:GetPartyResumeHelperFrame()
 
     frame.edit:SetText(self:BuildPartyResumeMessage())
@@ -856,7 +913,9 @@ function M:HookPartyResumeDialog()
 
     LFGListApplicationDialog:HookScript("OnShow", function()
         C_Timer.After(0, function()
-            M:ShowPartyResumeHelper()
+            if IsPartyResumeEnabled() then
+                M:ShowPartyResumeHelper()
+            end
         end)
     end)
 
