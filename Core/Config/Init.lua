@@ -15,6 +15,7 @@ function ns:BuildOptions()
             keystone = ns:CreateKeystoneReporter(),
             autogreeting = ns:CreateAutoGreetingOptions(),
             dice = ns:CreateDiceOptions(),
+            commands = ns:CreateCommandOptions(),
             profiles = ns:CreateProfileOptions(),
         },
     }

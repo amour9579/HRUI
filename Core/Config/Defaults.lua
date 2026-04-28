@@ -125,6 +125,16 @@ ns.Defaults = {
         itemTooltip = {
             alwaysCompareItems = false,
         },
+        commands = {
+            initialized = true,
+            entries = {
+                { enabled = true, trigger = "/rl", action = "/reload" },
+                { enabled = true, trigger = "/기", action = "/reload" },
+                { enabled = false, trigger = "", action = "" },
+                { enabled = false, trigger = "", action = "" },
+                { enabled = false, trigger = "", action = "" },
+            },
+        },
         chat = {
             enabled = true,
 
