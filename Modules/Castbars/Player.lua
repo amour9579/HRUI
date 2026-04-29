@@ -135,20 +135,6 @@ local function HookProfessionsCastbarAnchor()
     end
 end
 
-if event == "UNIT_SPELLCAST_EMPOWER_START"
-    or event == "UNIT_SPELLCAST_EMPOWER_UPDATE" then
-    UpdatePlayerCastState(self)
-
-    if C_Timer and C_Timer.After then
-        C_Timer.After(0, function()
-            if ns.PlayerCastbar then
-                UpdatePlayerCastState(ns.PlayerCastbar)
-            end
-        end)
-    end
-
-    return
-end
 local function UpdatePlayerCastState(frame)
     if not frame or not ns.db.profile.castbars.player.enabled then
         if frame then
