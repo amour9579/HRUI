@@ -157,9 +157,23 @@ local function UpdatePlayerCastState(frame)
         return
     end
 
-    local chName, _, chTexture, chStartTimeMS, chEndTimeMS, _, chNotInterruptible =
+    local chName, _, chTexture, chStartTimeMS, chEndTimeMS, _, chNotInterruptible, _, isEmpowered, numEmpowerStages =
         UnitChannelInfo("player")
 
+    if chName and isEmpowered then
+        UpdatePlayerCastbarAnchor(frame)
+        ns:StartCastbarEmpower(
+            frame,
+            "player",
+            chName,
+            chTexture,
+            chStartTimeMS,
+            chEndTimeMS,
+            chNotInterruptible,
+            numEmpowerStages
+        )
+        return
+    end
     if chName and chStartTimeMS and chEndTimeMS then
         UpdatePlayerCastbarAnchor(frame)
         ns:StartCastbarChannel(frame, chName, chTexture, chStartTimeMS, chEndTimeMS, chNotInterruptible)
@@ -242,10 +256,37 @@ function ns:SpawnPlayerCastbar()
             return
         end
 
+        if event == "UNIT_SPELLCAST_EMPOWER_START"
+            or event == "UNIT_SPELLCAST_EMPOWER_UPDATE" then
+            UpdatePlayerCastState(self)
+
+            if C_Timer and C_Timer.After then
+                C_Timer.After(0, function()
+                    if ns.PlayerCastbar then
+                        UpdatePlayerCastState(ns.PlayerCastbar)
+                    end
+                end)
+            end
+
+            return
+        end
+
+        if event == "UNIT_SPELLCAST_EMPOWER_STOP" then
+            ns:ResetCastbar(self)
+            return
+        end
+
+        -- Empower 중에는 일반 CHANNEL_STOP / STOP이 먼저 와도 지우지 않음
+        if self.empowering and (
+                event == "UNIT_SPELLCAST_STOP"
+                or event == "UNIT_SPELLCAST_CHANNEL_STOP"
+            ) then
+            return
+        end
         if event == "UNIT_SPELLCAST_STOP"
+            or event == "UNIT_SPELLCAST_FAILED"
             or event == "UNIT_SPELLCAST_INTERRUPTED"
-            or event == "UNIT_SPELLCAST_CHANNEL_STOP"
-            or event == "UNIT_SPELLCAST_EMPOWER_STOP" then
+            or event == "UNIT_SPELLCAST_CHANNEL_STOP" then
             ns:ResetCastbar(self)
             return
         end
