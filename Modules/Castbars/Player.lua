@@ -135,6 +135,20 @@ local function HookProfessionsCastbarAnchor()
     end
 end
 
+if event == "UNIT_SPELLCAST_EMPOWER_START"
+    or event == "UNIT_SPELLCAST_EMPOWER_UPDATE" then
+    UpdatePlayerCastState(self)
+
+    if C_Timer and C_Timer.After then
+        C_Timer.After(0, function()
+            if ns.PlayerCastbar then
+                UpdatePlayerCastState(ns.PlayerCastbar)
+            end
+        end)
+    end
+
+    return
+end
 local function UpdatePlayerCastState(frame)
     if not frame or not ns.db.profile.castbars.player.enabled then
         if frame then
@@ -143,17 +157,21 @@ local function UpdatePlayerCastState(frame)
         return
     end
 
-    local name, _, texture, startTimeMS, endTimeMS, _, _, notInterruptible = UnitCastingInfo("player")
-    if name and startTimeMS and endTimeMS then
-        UpdatePlayerCastbarAnchor(frame)
-        ns:StartCastbarCast(frame, name, texture, startTimeMS, endTimeMS, notInterruptible)
-        return
-    end
+    local chName, _, chTexture, chStartTimeMS, chEndTimeMS, _, chNotInterruptible =
+        UnitChannelInfo("player")
 
-    local chName, _, chTexture, chStartTimeMS, chEndTimeMS, _, chNotInterruptible = UnitChannelInfo("player")
     if chName and chStartTimeMS and chEndTimeMS then
         UpdatePlayerCastbarAnchor(frame)
         ns:StartCastbarChannel(frame, chName, chTexture, chStartTimeMS, chEndTimeMS, chNotInterruptible)
+        return
+    end
+
+    local name, _, texture, startTimeMS, endTimeMS, _, _, notInterruptible =
+        UnitCastingInfo("player")
+
+    if name and startTimeMS and endTimeMS then
+        UpdatePlayerCastbarAnchor(frame)
+        ns:StartCastbarCast(frame, name, texture, startTimeMS, endTimeMS, notInterruptible)
         return
     end
 
@@ -190,6 +208,9 @@ function ns:SpawnPlayerCastbar()
     frame:RegisterUnitEvent("UNIT_SPELLCAST_FAILED", "player")
     frame:RegisterUnitEvent("UNIT_SPELLCAST_INTERRUPTED", "player")
     frame:RegisterUnitEvent("UNIT_SPELLCAST_DELAYED", "player")
+    frame:RegisterUnitEvent("UNIT_SPELLCAST_EMPOWER_START", "player")
+    frame:RegisterUnitEvent("UNIT_SPELLCAST_EMPOWER_UPDATE", "player")
+    frame:RegisterUnitEvent("UNIT_SPELLCAST_EMPOWER_STOP", "player")
     frame:RegisterUnitEvent("UNIT_SPELLCAST_CHANNEL_START", "player")
     frame:RegisterUnitEvent("UNIT_SPELLCAST_CHANNEL_UPDATE", "player")
     frame:RegisterUnitEvent("UNIT_SPELLCAST_CHANNEL_STOP", "player")
@@ -223,7 +244,8 @@ function ns:SpawnPlayerCastbar()
 
         if event == "UNIT_SPELLCAST_STOP"
             or event == "UNIT_SPELLCAST_INTERRUPTED"
-            or event == "UNIT_SPELLCAST_CHANNEL_STOP" then
+            or event == "UNIT_SPELLCAST_CHANNEL_STOP"
+            or event == "UNIT_SPELLCAST_EMPOWER_STOP" then
             ns:ResetCastbar(self)
             return
         end
