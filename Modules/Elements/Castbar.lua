@@ -36,6 +36,209 @@ local function NormalizeMS(value)
     return n
 end
 
+local function SafeDurationCall(method, object)
+    if type(method) ~= "function" or not object then
+        return nil
+    end
+
+    local ok, value = pcall(method, object)
+    if ok then
+        return value
+    end
+
+    return nil
+end
+
+local function CopyDurationObject(duration)
+    if not duration then
+        return nil
+    end
+
+    if type(duration.Copy) == "function" then
+        local ok, copy = pcall(duration.Copy, duration)
+        if ok and copy then
+            return copy
+        end
+    end
+
+    return duration
+end
+
+local function HideEmpowerStages(castbar)
+    if not castbar or not castbar.EmpowerStages then
+        return
+    end
+
+    for _, marker in ipairs(castbar.EmpowerStages) do
+        marker:Hide()
+    end
+end
+
+local function NormalizePercent(value)
+    local n = tonumber(value)
+    if not n then
+        return nil
+    end
+
+    -- API/환경 차이 방어: 25 또는 0.25 둘 다 처리
+    if n > 1 then
+        n = n / 100
+    end
+
+    if n <= 0 then
+        return nil
+    end
+
+    return n
+end
+
+local function GetEmpowerStageFractions(unit, numStages)
+    -- Retail 12.0+ 권장 경로: hold-at-max 포함 비율
+    if type(UnitEmpoweredStagePercentages) == "function" then
+        local ok, percentages = pcall(UnitEmpoweredStagePercentages, unit, true)
+
+        if ok and type(percentages) == "table" and #percentages > 0 then
+            local fractions = {}
+            local acc = 0
+
+            -- 마지막 값은 hold-at-max 구간이므로, 그 직전까지 누적선 표시
+            for i = 1, math.max(#percentages - 1, 0) do
+                local pct = NormalizePercent(percentages[i])
+                if pct then
+                    acc = acc + pct
+
+                    if acc > 0 and acc < 1 then
+                        fractions[#fractions + 1] = acc
+                    end
+                end
+            end
+
+            if #fractions > 0 then
+                return fractions
+            end
+        end
+    end
+
+    -- 구버전 fallback
+    if type(GetUnitEmpowerStageDuration) ~= "function" then
+        return nil
+    end
+
+    numStages = tonumber(numStages) or 0
+    if numStages <= 0 then
+        return nil
+    end
+
+    local durations = {}
+    local total = 0
+
+    for i = 1, numStages do
+        local d = tonumber(GetUnitEmpowerStageDuration(unit, i)) or 0
+        durations[i] = d
+        total = total + d
+    end
+
+    if type(GetUnitEmpowerHoldAtMaxTime) == "function" then
+        total = total + (tonumber(GetUnitEmpowerHoldAtMaxTime(unit)) or 0)
+    end
+
+    if total <= 0 then
+        return nil
+    end
+
+    local fractions = {}
+    local acc = 0
+
+    for i = 1, numStages do
+        acc = acc + durations[i]
+
+        if acc > 0 and acc < total then
+            fractions[#fractions + 1] = acc / total
+        end
+    end
+
+    return fractions
+end
+
+local function ShowEmpowerStages(castbar, unit, numStages)
+    if not castbar then
+        return
+    end
+
+    HideEmpowerStages(castbar)
+
+    local fractions = GetEmpowerStageFractions(unit, numStages)
+    if not fractions or #fractions == 0 then
+        return
+    end
+
+    castbar.EmpowerStages = castbar.EmpowerStages or {}
+
+    local width = castbar:GetWidth()
+    local height = math.max(castbar:GetHeight() + 4, 8)
+
+    for i, fraction in ipairs(fractions) do
+        local marker = castbar.EmpowerStages[i]
+
+        if not marker then
+            marker = castbar:CreateTexture(nil, "OVERLAY")
+            marker:SetTexture("Interface\\Buttons\\WHITE8X8")
+            castbar.EmpowerStages[i] = marker
+        end
+
+        marker:ClearAllPoints()
+        marker:SetSize(2, height)
+        marker:SetVertexColor(1, 1, 1, 0.85)
+        marker:SetPoint("CENTER", castbar, "LEFT", width * fraction, 0)
+        marker:Show()
+    end
+
+    for i = #fractions + 1, #castbar.EmpowerStages do
+        castbar.EmpowerStages[i]:Hide()
+    end
+end
+
+local function GetEmpowerDurationObject(unit)
+    if type(UnitEmpoweredChannelDuration) ~= "function" then
+        return nil
+    end
+
+    local ok, duration = pcall(UnitEmpoweredChannelDuration, unit, true)
+    if ok and duration then
+        return CopyDurationObject(duration)
+    end
+
+    return nil
+end
+
+local function GetFallbackEmpowerDuration(unit, startTimeMS, endTimeMS, numStages)
+    local total = 0
+
+    if type(GetUnitEmpowerStageDuration) == "function" then
+        numStages = tonumber(numStages) or 0
+
+        for i = 1, numStages do
+            total = total + (tonumber(GetUnitEmpowerStageDuration(unit, i)) or 0)
+        end
+
+        if type(GetUnitEmpowerHoldAtMaxTime) == "function" then
+            total = total + (tonumber(GetUnitEmpowerHoldAtMaxTime(unit)) or 0)
+        end
+
+        if total > 0 then
+            return total / 1000
+        end
+    end
+
+    local startMS = NormalizeMS(startTimeMS)
+    local endMS = NormalizeMS(endTimeMS)
+
+    if startMS > 0 and endMS > startMS then
+        return (endMS - startMS) / 1000
+    end
+
+    return 0
+end
 local function ClearCastbarVisuals(castbar)
     if castbar.Text then
         castbar.Text:SetText("")
@@ -52,6 +255,7 @@ local function ClearCastbarVisuals(castbar)
     if castbar.Spark then
         castbar.Spark:Hide()
     end
+    HideEmpowerStages(castbar)
 end
 
 function ns:CreateCastbar(frame, db)
@@ -156,10 +360,13 @@ function ns:ResetCastbar(frame)
 
     frame.casting = nil
     frame.channeling = nil
+    frame.empowering = nil
     frame.startTime = nil
     frame.endTime = nil
     frame.notInterruptible = nil
 
+    frame.empowerDuration = nil
+    frame.empowerTotal = nil
     frame:SetMinMaxValues(0, 1)
     frame:SetValue(0)
 
@@ -257,8 +464,68 @@ function ns:StartCastbarChannel(frame, spellName, icon, startTimeMS, endTimeMS, 
     frame:Show()
 end
 
+function ns:StartCastbarEmpower(frame, unit, spellName, icon, startTimeMS, endTimeMS, notInterruptible, numStages)
+    if not frame then
+        return
+    end
+
+    unit = unit or frame.unit or "player"
+
+    local durationObject = GetEmpowerDurationObject(unit)
+    local totalDuration = nil
+
+    if durationObject then
+        totalDuration = SafeDurationCall(durationObject.GetTotalDuration, durationObject)
+    end
+
+    totalDuration = tonumber(totalDuration)
+
+    if not totalDuration or totalDuration <= 0 then
+        totalDuration = GetFallbackEmpowerDuration(unit, startTimeMS, endTimeMS, numStages)
+    end
+
+    if not totalDuration or totalDuration <= 0 then
+        ns:ResetCastbar(frame)
+        return
+    end
+
+    local style = GetCastbarStyle()
+    local now = GetTime()
+
+    frame.casting = nil
+    frame.channeling = nil
+    frame.empowering = true
+
+    frame.startTime = now
+    frame.endTime = now + totalDuration
+    frame.notInterruptible = notInterruptible
+
+    frame.empowerDuration = durationObject
+    frame.empowerTotal = totalDuration
+
+    frame:SetMinMaxValues(0, totalDuration)
+    frame:SetValue(0)
+
+    if frame.Text then
+        frame.Text:SetText(spellName or "")
+    end
+
+    if frame.Icon then
+        frame.Icon:SetTexture(icon)
+    end
+
+    if notInterruptible then
+        frame:SetStatusBarColor(unpack(style.nonInterruptible))
+    else
+        frame:SetStatusBarColor(unpack(style.channel))
+    end
+
+    ShowEmpowerStages(frame, unit, numStages)
+
+    frame:Show()
+end
 function ns:UpdateCastbar(frame, currentTime)
-    if not frame or (not frame.casting and not frame.channeling) then
+    if not frame or (not frame.casting and not frame.channeling and not frame.empowering) then
         return
     end
 
@@ -320,6 +587,62 @@ function ns:UpdateCastbar(frame, currentTime)
             if style.showSpark then
                 local width = frame:GetWidth()
                 local progress = elapsed / duration
+                frame.Spark:ClearAllPoints()
+                frame.Spark:SetPoint("CENTER", frame, "LEFT", width * progress, 0)
+                frame.Spark:Show()
+            else
+                frame.Spark:Hide()
+            end
+        end
+    elseif frame.empowering then
+        local total = frame.empowerTotal or 0
+        local remaining = nil
+
+        if frame.empowerDuration then
+            remaining = SafeDurationCall(frame.empowerDuration.GetRemainingDuration, frame.empowerDuration)
+            local durationTotal = SafeDurationCall(frame.empowerDuration.GetTotalDuration, frame.empowerDuration)
+
+            if tonumber(durationTotal) and tonumber(durationTotal) > 0 then
+                total = tonumber(durationTotal)
+                frame.empowerTotal = total
+            end
+        end
+
+        remaining = tonumber(remaining)
+
+        if not remaining then
+            remaining = (frame.endTime or 0) - currentTime
+        end
+
+        if total <= 0 then
+            ns:ResetCastbar(frame)
+            return
+        end
+
+        if remaining <= 0 then
+            ns:ResetCastbar(frame)
+            return
+        end
+
+        local elapsed = total - remaining
+        if elapsed < 0 then
+            elapsed = 0
+        elseif elapsed > total then
+            elapsed = total
+        end
+
+        frame:SetMinMaxValues(0, total)
+        frame:SetValue(elapsed)
+
+        if frame.Time then
+            frame.Time:SetText(FormatTime(remaining))
+        end
+
+        if frame.Spark then
+            if style.showSpark then
+                local width = frame:GetWidth()
+                local progress = elapsed / total
+
                 frame.Spark:ClearAllPoints()
                 frame.Spark:SetPoint("CENTER", frame, "LEFT", width * progress, 0)
                 frame.Spark:Show()
