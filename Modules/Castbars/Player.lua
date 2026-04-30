@@ -62,6 +62,7 @@ local function ApplyProfessionVisualState(frame, usingProfessionAnchor)
         end
     end
 end
+
 local function UpdatePlayerCastbarAnchor(frame)
     if not frame then
         return
@@ -135,6 +136,13 @@ local function HookProfessionsCastbarAnchor()
     end
 end
 
+local stopEvents = {
+    UNIT_SPELLCAST_STOP = true,
+    UNIT_SPELLCAST_FAILED = true,
+    UNIT_SPELLCAST_INTERRUPTED = true,
+    UNIT_SPELLCAST_CHANNEL_STOP = true,
+    UNIT_SPELLCAST_EMPOWER_STOP = true,
+}
 local function UpdatePlayerCastState(frame)
     if not frame or not ns.db.profile.castbars.player.enabled then
         if frame then
@@ -143,8 +151,15 @@ local function UpdatePlayerCastState(frame)
         return
     end
 
-    local chName, _, chTexture, chStartTimeMS, chEndTimeMS, _, chNotInterruptible, _, isEmpowered, numEmpowerStages =
-        UnitChannelInfo("player")
+    local channelInfo = { UnitChannelInfo("player") }
+    local chName = channelInfo[1]
+    local chTexture = channelInfo[3]
+    local chStartTimeMS = channelInfo[4]
+    local chEndTimeMS = channelInfo[5]
+    local chNotInterruptible = channelInfo[7]
+    local isEmpowered = channelInfo[9]
+    local numEmpowerStages = channelInfo[10]
+    local chCastBarID = channelInfo[11]
 
     if chName and isEmpowered then
         UpdatePlayerCastbarAnchor(frame)
@@ -156,28 +171,86 @@ local function UpdatePlayerCastState(frame)
             chStartTimeMS,
             chEndTimeMS,
             chNotInterruptible,
-            numEmpowerStages
+            numEmpowerStages,
+            chCastBarID
         )
         return
     end
+
     if chName and chStartTimeMS and chEndTimeMS then
         UpdatePlayerCastbarAnchor(frame)
-        ns:StartCastbarChannel(frame, chName, chTexture, chStartTimeMS, chEndTimeMS, chNotInterruptible)
+        ns:StartCastbarChannel(
+            frame,
+            chName,
+            chTexture,
+            chStartTimeMS,
+            chEndTimeMS,
+            chNotInterruptible,
+            chCastBarID
+        )
         return
     end
 
-    local name, _, texture, startTimeMS, endTimeMS, _, _, notInterruptible =
-        UnitCastingInfo("player")
+    local castInfo = { UnitCastingInfo("player") }
+    local name = castInfo[1]
+    local texture = castInfo[3]
+    local startTimeMS = castInfo[4]
+    local endTimeMS = castInfo[5]
+    local castID = castInfo[7]
+    local notInterruptible = castInfo[8]
 
     if name and startTimeMS and endTimeMS then
         UpdatePlayerCastbarAnchor(frame)
-        ns:StartCastbarCast(frame, name, texture, startTimeMS, endTimeMS, notInterruptible)
+        ns:StartCastbarCast(
+            frame,
+            name,
+            texture,
+            startTimeMS,
+            endTimeMS,
+            notInterruptible,
+            castID
+        )
         return
     end
 
     ns:ResetCastbar(frame)
 end
 
+local function RefreshOrResetPlayerCastbar(frame)
+    local function run()
+        if not frame or frame ~= ns.PlayerCastbar then
+            return
+        end
+
+        if UnitChannelInfo("player") or UnitCastingInfo("player") then
+            UpdatePlayerCastState(frame)
+        else
+            ns:ResetCastbar(frame)
+        end
+    end
+
+    if C_Timer and C_Timer.After then
+        C_Timer.After(0, run)
+    else
+        run()
+    end
+end
+
+local function UpdatePlayerCastStateSoon(frame)
+    if not frame then
+        return
+    end
+
+    UpdatePlayerCastState(frame)
+
+    if C_Timer and C_Timer.After then
+        C_Timer.After(0, function()
+            if ns.PlayerCastbar then
+                UpdatePlayerCastState(ns.PlayerCastbar)
+            end
+        end)
+    end
+end
 function ns:SpawnPlayerCastbar()
     if ns.PlayerCastbar then
         DisableBlizzardPlayerCastBar()
@@ -242,38 +315,18 @@ function ns:SpawnPlayerCastbar()
             return
         end
 
+        if stopEvents[event] then
+            RefreshOrResetPlayerCastbar(self)
+            return
+        end
+
         if event == "UNIT_SPELLCAST_EMPOWER_START"
-            or event == "UNIT_SPELLCAST_EMPOWER_UPDATE" then
-            UpdatePlayerCastState(self)
-
-            if C_Timer and C_Timer.After then
-                C_Timer.After(0, function()
-                    if ns.PlayerCastbar then
-                        UpdatePlayerCastState(ns.PlayerCastbar)
-                    end
-                end)
-            end
-
-            return
-        end
-
-        if event == "UNIT_SPELLCAST_EMPOWER_STOP" then
-            ns:ResetCastbar(self)
-            return
-        end
-
-        -- Empower 중에는 일반 CHANNEL_STOP / STOP이 먼저 와도 지우지 않음
-        if self.empowering and (
-                event == "UNIT_SPELLCAST_STOP"
-                or event == "UNIT_SPELLCAST_CHANNEL_STOP"
-            ) then
-            return
-        end
-        if event == "UNIT_SPELLCAST_STOP"
-            or event == "UNIT_SPELLCAST_FAILED"
-            or event == "UNIT_SPELLCAST_INTERRUPTED"
-            or event == "UNIT_SPELLCAST_CHANNEL_STOP" then
-            ns:ResetCastbar(self)
+            or event == "UNIT_SPELLCAST_EMPOWER_UPDATE"
+            or event == "UNIT_SPELLCAST_CHANNEL_START"
+            or event == "UNIT_SPELLCAST_CHANNEL_UPDATE"
+            or event == "UNIT_SPELLCAST_START"
+            or event == "UNIT_SPELLCAST_DELAYED" then
+            UpdatePlayerCastStateSoon(self)
             return
         end
 
