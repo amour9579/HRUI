@@ -451,6 +451,70 @@ local function GetPartyResumeValue(key, defaultValue)
 
     return fields[key]
 end
+local PARTY_RESUME_SPEC_ABBREV = {
+    HUNTER = {
+        ["사격"] = "격냥",
+        ["생존"] = "생냥",
+        ["야수"] = "야냥",
+    },
+    WARRIOR = {
+        ["무기"] = "무전",
+        ["분노"] = "분전",
+        ["방어"] = "방전",
+    },
+    MAGE = {
+        ["비전"] = "비법",
+        ["냉기"] = "냉법",
+        ["화염"] = "화법",
+    },
+    WARLOCK = {
+        ["악마"] = "악흑",
+        ["고통"] = "고흑",
+        ["파괴"] = "파흑",
+    },
+    PRIEST = {
+        ["수양"] = "수사",
+        ["암흑"] = "암사",
+        ["신성"] = "신사",
+    },
+    SHAMAN = {
+        ["정기"] = "정술",
+        ["고양"] = "고술",
+        ["복원"] = "복술",
+    },
+    PALADIN = {
+        ["신성"] = "신기",
+        ["징벌"] = "징기",
+        ["보호"] = "보기",
+    },
+    DRUID = {
+        ["회복"] = "회드",
+        ["야성"] = "야드",
+        ["조화"] = "조드",
+        ["수호"] = "수드",
+    },
+    DEATHKNIGHT = {
+        ["혈기"] = "혈죽",
+        ["냉기"] = "냉죽",
+        ["부정"] = "부죽",
+    },
+}
+
+local function GetPartyResumeSpecDisplayName(specName)
+    if GetPartyResumeValue("useSpecAbbrev", false) ~= true then
+        return specName
+    end
+
+    local _, classToken = UnitClass("player")
+    local classSpecAbbrev = classToken and PARTY_RESUME_SPEC_ABBREV[classToken]
+
+    if not classSpecAbbrev then
+        return specName
+    end
+
+    return classSpecAbbrev[specName] or specName
+end
+
 local function GetCurrentSpecIDAndName()
     local fallbackName = "캐릭터"
 
@@ -531,11 +595,81 @@ local function GetTierSetCount()
     return count
 end
 
+local EQUIPPED_ITEM_SLOTS = {
+    1,  -- 머리
+    2,  -- 목
+    3,  -- 어깨
+    5,  -- 가슴
+    6,  -- 허리
+    7,  -- 다리
+    8,  -- 발
+    9,  -- 손목
+    10, -- 손
+    11, -- 손가락 1
+    12, -- 손가락 2
+    13, -- 장신구 1
+    14, -- 장신구 2
+    15, -- 등
+    16, -- 주무기
+    17, -- 보조장비
+}
+
+local EMBELLISHMENT_TOOLTIP_KEYWORD = "장식됨"
+
+local function TooltipDataHasEmbellishment(tooltipData)
+    if not tooltipData or type(tooltipData.lines) ~= "table" then
+        return false
+    end
+
+    for _, line in ipairs(tooltipData.lines) do
+        local leftText = line and line.leftText
+
+        if type(leftText) == "string" and leftText:find(EMBELLISHMENT_TOOLTIP_KEYWORD, 1, true) then
+            return true
+        end
+    end
+
+    return false
+end
+
+local function IsEquippedItemEmbellished(slot)
+    if not GetInventoryItemLink("player", slot) then
+        return false
+    end
+
+    if C_TooltipInfo and C_TooltipInfo.GetInventoryItem then
+        local ok, tooltipData = pcall(C_TooltipInfo.GetInventoryItem, "player", slot)
+
+        if ok and TooltipDataHasEmbellishment(tooltipData) then
+            return true
+        end
+    end
+
+    return false
+end
+
+local function GetAutomaticEmbellishmentCount()
+    local count = 0
+
+    for _, slot in ipairs(EQUIPPED_ITEM_SLOTS) do
+        if IsEquippedItemEmbellished(slot) then
+            count = count + 1
+
+            if count >= 2 then
+                return 2
+            end
+        end
+    end
+
+    return count
+end
+
 function M:BuildPartyResumeMessage()
     if IsPartyResumeManual() then
         return TrimText(GetPartyResumeManualMessage())
     end
     local _, specName = GetCurrentSpecIDAndName()
+    specName = GetPartyResumeSpecDisplayName(specName)
     local parts = {}
 
     if IsPartyResumeFieldEnabled("showItemLevel") then
@@ -550,7 +684,14 @@ function M:BuildPartyResumeMessage()
         end
     end
 
-    local embellishmentCount = tonumber(GetPartyResumeValue("embellishmentCount", 0)) or 0
+    local embellishmentSetting = GetPartyResumeValue("embellishmentCount", "auto")
+    local embellishmentCount
+
+    if embellishmentSetting == "auto" then
+        embellishmentCount = GetAutomaticEmbellishmentCount()
+    else
+        embellishmentCount = tonumber(embellishmentSetting) or 0
+    end
 
     if embellishmentCount > 0 then
         if embellishmentCount > 2 then
