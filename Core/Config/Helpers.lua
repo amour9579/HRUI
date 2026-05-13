@@ -17,6 +17,68 @@ function ns:GetCastbarDB(unit)
     return GetRoot("castbars", unit)
 end
 
+local defaultCastbarColors = {
+    castColor = { 0.95, 0.75, 0.20 },
+    channelColor = { 0.20, 0.70, 1.00 },
+    nonInterruptibleColor = { 0.75, 0.20, 0.20 },
+}
+
+local function GetCastbarStyleDB()
+    return GetRoot("castbars", "style")
+end
+
+function ns:GetCastbarUnitColor(unit, colorKey)
+    local unitDB = ns:GetCastbarDB(unit)
+    local unitColors = unitDB and unitDB.colors
+    local unitColor = unitColors and unitColors[colorKey]
+
+    if type(unitColor) == "table" then
+        return unitColor
+    end
+
+    local styleDB = GetCastbarStyleDB()
+    local legacyColor = styleDB and styleDB[colorKey]
+
+    if type(legacyColor) == "table" then
+        return legacyColor
+    end
+
+    return defaultCastbarColors[colorKey] or { 1, 1, 1 }
+end
+
+function ns:SetCastbarUnitColor(unit, colorKey, r, g, b)
+    local unitDB = ns:GetCastbarDB(unit)
+    if not unitDB or not defaultCastbarColors[colorKey] then
+        return
+    end
+
+    unitDB.colors = unitDB.colors or {}
+    local color = unitDB.colors[colorKey]
+
+    if type(color) ~= "table" then
+        color = {}
+        unitDB.colors[colorKey] = color
+    end
+
+    color[1], color[2], color[3] = r, g, b
+    ns:RefreshCastbar(unit)
+end
+
+function ns:GetCastbarStyle(unit)
+    local styleDB = GetCastbarStyleDB()
+
+    return {
+        cast = ns:GetCastbarUnitColor(unit, "castColor"),
+        channel = ns:GetCastbarUnitColor(unit, "channelColor"),
+        nonInterruptible = ns:GetCastbarUnitColor(unit, "nonInterruptibleColor"),
+        bg = { 0.08, 0.08, 0.08, (styleDB and styleDB.bgAlpha) or 0.90 },
+        border = { 0.20, 0.20, 0.20, 1.00 },
+        text = { 1.00, 1.00, 1.00 },
+        showBorder = (styleDB and styleDB.showBorder) ~= false,
+        showSpark = (styleDB and styleDB.showSpark) ~= false,
+    }
+end
+
 function ns:RefreshUnit(unit)
     if ns.Modules.UnitFrames and ns.Modules.UnitFrames.RefreshUnit then
         ns.Modules.UnitFrames:RefreshUnit(unit)

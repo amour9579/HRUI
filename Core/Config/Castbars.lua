@@ -144,6 +144,46 @@ local function CreateCastbarGroup(unit, label)
                     end
                 end,
             },
+            colorHeader = { type = "header", name = "색상", order = 8 },
+            castColor = {
+                type = "color",
+                name = "시전 색상",
+                order = 8.1,
+                hasAlpha = false,
+                get = function()
+                    local c = ns:GetCastbarUnitColor(unit, "castColor")
+                    return c[1], c[2], c[3]
+                end,
+                set = function(_, r, g, b)
+                    ns:SetCastbarUnitColor(unit, "castColor", r, g, b)
+                end,
+            },
+            channelColor = {
+                type = "color",
+                name = "채널 색상",
+                order = 8.2,
+                hasAlpha = false,
+                get = function()
+                    local c = ns:GetCastbarUnitColor(unit, "channelColor")
+                    return c[1], c[2], c[3]
+                end,
+                set = function(_, r, g, b)
+                    ns:SetCastbarUnitColor(unit, "channelColor", r, g, b)
+                end,
+            },
+            nonInterruptibleColor = {
+                type = "color",
+                name = "차단 불가 색상",
+                order = 8.3,
+                hasAlpha = false,
+                get = function()
+                    local c = ns:GetCastbarUnitColor(unit, "nonInterruptibleColor")
+                    return c[1], c[2], c[3]
+                end,
+                set = function(_, r, g, b)
+                    ns:SetCastbarUnitColor(unit, "nonInterruptibleColor", r, g, b)
+                end,
+            },
             iconHeader = { type = "header", name = "아이콘", order = 10 },
             iconEnabled = {
                 type = "toggle",
@@ -256,51 +296,6 @@ function ns:CreateCastbarOptions()
                 name = "스타일",
                 order = 1,
                 args = {
-                    castColor = {
-                        type = "color",
-                        name = "시전 색상",
-                        order = 1,
-                        hasAlpha = false,
-                        get = function()
-                            local c = ns.db.profile.castbars.style.castColor; return c[1], c[2], c[3]
-                        end,
-                        set = function(_, r, g, b)
-                            local c = ns.db.profile.castbars.style.castColor; c[1], c[2], c[3] = r, g, b; ns
-                                :RefreshAllCastbars()
-                        end,
-                    },
-                    channelColor = {
-                        type = "color",
-                        name = "채널 색상",
-                        order = 2,
-                        hasAlpha = false,
-                        get = function()
-                            local c = ns.db.profile.castbars.style.channelColor; return c[1], c[2], c[3]
-                        end,
-                        set = function(_, r, g, b)
-                            local c = ns.db.profile.castbars.style.channelColor; c[1], c[2], c[3] = r, g, b; ns
-                                :RefreshAllCastbars()
-                        end,
-                    },
-                    nonInterruptibleColor = {
-                        type = "color",
-                        name = "차단 불가 색상",
-                        order = 3,
-                        hasAlpha = false,
-                        get = function()
-                            local c = ns.db.profile.castbars.style.nonInterruptibleColor; return c[1], c[2], c[3]
-                        end,
-                        set = function(_, r, g, b)
-                            local c = ns.db.profile.castbars.style.nonInterruptibleColor; c[1], c[2], c[3] = r, g, b; ns
-                                :RefreshAllCastbars()
-                        end,
-                    },
-                    break1 = {
-                        type = "description",
-                        name = "\n",
-                        width = "full",
-                        order = 4.1,
-                    },
                     showBorder = {
                         type = "toggle",
                         name = "테두리 표시",

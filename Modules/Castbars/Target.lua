@@ -37,15 +37,20 @@ local startEvents = {
 }
 
 local function GetTargetCastbarStyle()
-    local style = ns.db
-        and ns.db.profile
-        and ns.db.profile.castbars
-        and ns.db.profile.castbars.style
+    if ns.GetCastbarStyle then
+        local style = ns:GetCastbarStyle("target")
+
+        return {
+            cast = style.cast,
+            channel = style.channel,
+            nonInterruptible = style.nonInterruptible,
+        }
+    end
 
     return {
-        cast = (style and style.castColor) or { 0.95, 0.75, 0.20 },
-        channel = (style and style.channelColor) or { 0.20, 0.70, 1.00 },
-        nonInterruptible = (style and style.nonInterruptibleColor) or { 0.75, 0.20, 0.20 },
+        cast = { 0.95, 0.75, 0.20 },
+        channel = { 0.20, 0.70, 1.00 },
+        nonInterruptible = { 0.75, 0.20, 0.20 },
     }
 end
 

@@ -1,17 +1,21 @@
 local _, ns = ...
 
-local function GetCastbarStyle()
-    local style = ns.db and ns.db.profile and ns.db.profile.castbars and ns.db.profile.castbars.style
+local function GetCastbarStyle(frame)
+    local unit = frame and frame.unit or nil
+
+    if ns.GetCastbarStyle then
+        return ns:GetCastbarStyle(unit)
+    end
 
     return {
-        cast = (style and style.castColor) or { 0.95, 0.75, 0.20 },
-        channel = (style and style.channelColor) or { 0.20, 0.70, 1.00 },
-        nonInterruptible = (style and style.nonInterruptibleColor) or { 0.75, 0.20, 0.20 },
-        bg = { 0.08, 0.08, 0.08, (style and style.bgAlpha) or 0.90 },
+        cast = { 0.95, 0.75, 0.20 },
+        channel = { 0.20, 0.70, 1.00 },
+        nonInterruptible = { 0.75, 0.20, 0.20 },
+        bg = { 0.08, 0.08, 0.08, 0.90 },
         border = { 0.20, 0.20, 0.20, 1.00 },
         text = { 1.00, 1.00, 1.00 },
-        showBorder = (style and style.showBorder) ~= false,
-        showSpark = (style and style.showSpark) ~= false,
+        showBorder = true,
+        showSpark = true,
     }
 end
 
@@ -263,7 +267,7 @@ function ns:CreateCastbar(frame, db)
         return
     end
 
-    local style = GetCastbarStyle()
+    local style = GetCastbarStyle(frame)
 
     frame:SetStatusBarTexture(ns:GetTexture())
 
@@ -391,7 +395,7 @@ function ns:StartCastbarCast(frame, spellName, icon, startTimeMS, endTimeMS, not
     local endTime = endMS / 1000
     local duration = math.max(endTime - startTime, 0)
 
-    local style = GetCastbarStyle()
+    local style = GetCastbarStyle(frame)
 
     frame.casting = true
     frame.channeling = nil
@@ -436,7 +440,7 @@ function ns:StartCastbarChannel(frame, spellName, icon, startTimeMS, endTimeMS, 
     local endTime = endMS / 1000
     local duration = math.max(endTime - startTime, 0)
 
-    local style = GetCastbarStyle()
+    local style = GetCastbarStyle(frame)
 
     frame.casting = nil
     frame.channeling = true
@@ -489,7 +493,7 @@ function ns:StartCastbarEmpower(frame, unit, spellName, icon, startTimeMS, endTi
         return
     end
 
-    local style = GetCastbarStyle()
+    local style = GetCastbarStyle(frame)
     local now = GetTime()
 
     frame.casting = nil
@@ -534,7 +538,7 @@ function ns:UpdateCastbar(frame, currentTime)
     local startTime = frame.startTime or 0
     local endTime = frame.endTime or 0
     local duration = math.max(endTime - startTime, 0)
-    local style = GetCastbarStyle()
+    local style = GetCastbarStyle(frame)
 
     if duration <= 0 then
         ns:ResetCastbar(frame)
