@@ -200,9 +200,10 @@ ns.Defaults = {
                 manual = false,
                 fields = {
                     showSpec = true,
+                    useSpecAbbrev = false,
                     showItemLevel = true,
                     showTierSet = true,
-                    embellishmentCount = 2,
+                    embellishmentCount = "auto",
                 },
             },
         },
