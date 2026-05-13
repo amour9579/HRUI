@@ -1,6 +1,7 @@
 local _, ns = ...
 
 local embellishmentCountValues = {
+    ["auto"] = "자동",
     ["0"] = "0 - 생략",
     ["1"] = "1",
     ["2"] = "2",
@@ -90,7 +91,15 @@ local function GetPartyResumeFieldValue(key)
         return fields[key]
     end
 
+    if key == "useSpecAbbrev" then
+        return fields[key] == true
+    end
+
     if key == "embellishmentCount" then
+        if fields[key] == "auto" then
+            return "auto"
+        end
+
         return tonumber(fields[key]) or 0
     end
 
@@ -100,7 +109,11 @@ local function SetPartyResumeFieldValue(key, value)
     local fields = GetPartyResumeFields()
 
     if key == "embellishmentCount" then
-        fields[key] = tonumber(value) or 0
+        if value == "auto" then
+            fields[key] = "auto"
+        else
+            fields[key] = tonumber(value) or 0
+        end
     else
         fields[key] = value
     end
@@ -231,6 +244,23 @@ function ns:CreateKeystoneReporter()
                         end,
                     },
 
+                    useSpecAbbrev = {
+                        type = "toggle",
+                        name = "전문화 약칭",
+                        desc = "이력서 전문화를 직업별 약칭으로 표시합니다. 예: 생존→생냥, 냉기 법사→냉법, 냉기 죽기→냉죽, 신성 기사→신기, 신성 사제→신사",
+                        width = "half",
+                        order = 3.15,
+                        get = function()
+                            return GetPartyResumeFieldValue("useSpecAbbrev")
+                        end,
+                        set = function(_, value)
+                            SetPartyResumeFieldValue("useSpecAbbrev", value)
+                        end,
+                        disabled = function()
+                            return not GetPartyResumeFieldValue("showSpec")
+                        end,
+                    },
+
                     showItemLevel = {
                         type = "toggle",
                         name = "템렙",
@@ -262,7 +292,7 @@ function ns:CreateKeystoneReporter()
                     embellishmentCount = {
                         type = "select",
                         name = "장식보유",
-                        desc = "이력서에 표시할 장식 보유 개수를 선택합니다. 0이면 생략합니다.",
+                        desc = "자동을 선택하면 착용 아이템 툴팁의 ‘장식됨’을 검사해 0~2개를 자동 표시합니다. 0이면 생략합니다.",
                         values = embellishmentCountValues,
                         style = "dropdown",
                         width = "half",
