@@ -588,6 +588,10 @@ local function GetTierSetCount()
 
             if bonuses and #bonuses > 0 then
                 count = count + 1
+
+                if count >= 4 then
+                    return 4
+                end
             end
         end
     end
