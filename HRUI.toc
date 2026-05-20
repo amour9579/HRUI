@@ -58,6 +58,7 @@ Modules\UnitFrames\UnitFrames.lua
 Modules\Castbars\Player.lua
 Modules\Castbars\Target.lua
 Modules\Castbars\Pet.lua
+Modules\Castbars\Boss.lua
 Modules\Castbars\Castbars.lua
 
 Modules\Chat\CombatMessage.lua

@@ -392,6 +392,21 @@ ns.Defaults = {
                 },
                 time = { enabled = true, },
             },
+            boss = {
+                enabled = true,
+                width = 220,
+                height = 18,
+                x = 0,
+                y = -4,
+                icon = { enabled = true, size = 18, },
+                text = {
+                    enabled = true,
+                    anchor = "CENTER",
+                    x = 0,
+                    y = 0,
+                },
+                time = { enabled = true, },
+            },
         },
     },
 }

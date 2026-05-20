@@ -42,7 +42,7 @@ local function CreateCastbarGroup(unit, label)
             },
             x = {
                 type = "input",
-                name = "중앙 기준 X",
+                name = unit == "boss" and "보스 프레임 기준 X" or "중앙 기준 X",
                 order = 4,
                 get = function() return ns:GetCastbarNumber(unit, "x") end,
                 set = function(
@@ -53,7 +53,7 @@ local function CreateCastbarGroup(unit, label)
             
             y = {
                 type = "input",
-                name = "중앙 기준 Y",
+                name = unit == "boss" and "보스 프레임 기준 Y" or "중앙 기준 Y",
                 order = 5,
                 get = function() return ns:GetCastbarNumber(unit, "y") end,
                 set = function(
@@ -65,6 +65,7 @@ local function CreateCastbarGroup(unit, label)
             move = {
                 type = "execute",
                 order = 6,
+                hidden = function() return unit == "boss" end,
                 name = function()
                     if ns.Movers and ns.Movers:IsUnlocked() then
                         return "이동 모드 종료"
@@ -89,56 +90,95 @@ local function CreateCastbarGroup(unit, label)
                 order = 7,
                 func = function()
                     local db = ns:GetCastbarDB(unit)
-                    local frame
+                    local frames = {}
+                    local bossPreviewShouldAutoHide = false
 
                     if unit == "player" then
-                        frame = ns.PlayerCastbar
+                        frames[1] = ns.PlayerCastbar
                     elseif unit == "target" then
-                        frame = ns.TargetCastbar
+                        frames[1] = ns.TargetCastbar
                     elseif unit == "pet" then
-                        frame = ns.PetCastbar
+                        frames[1] = ns.PetCastbar
+                    elseif unit == "boss" then
+                        local bossPreviewWasActive = ns.BossPreviewActive == true
+                        local moversUnlocked = ns.Movers
+                            and ns.Movers.IsUnlocked
+                            and ns.Movers:IsUnlocked()
+
+                        if ns.ShowBossPreviewFrames then
+                            ns:ShowBossPreviewFrames()
+                        end
+
+                        bossPreviewShouldAutoHide = not bossPreviewWasActive and not moversUnlocked
+
+                        if ns.BossPreviewFrames then
+                            for _, preview in ipairs(ns.BossPreviewFrames) do
+                                if preview and preview.Castbar then
+                                    frames[#frames + 1] = preview.Castbar
+                                end
+                            end
+                        end
                     end
 
-                    if not frame then
+                    if #frames == 0 then
+                        if unit == "boss" and bossPreviewShouldAutoHide and ns.HideBossPreviewFrames then
+                            ns:HideBossPreviewFrames()
+                        end
                         return
                     end
 
                     if not db or not db.enabled then
-                        if unit == "target" and ns.ResetTargetCastbar then
-                            ns:ResetTargetCastbar(frame)
-                        else
-                            ns:ResetCastbar(frame)
+                        for _, frame in ipairs(frames) do
+                            if unit == "target" and ns.ResetTargetCastbar then
+                                ns:ResetTargetCastbar(frame)
+                            else
+                                ns:ResetCastbar(frame)
+                            end
                         end
 
+                        if unit == "boss" and bossPreviewShouldAutoHide and ns.HideBossPreviewFrames then
+                            ns:HideBossPreviewFrames()
+                        end
                         return
-                    end
-
-                    if unit == "target" then
-                        frame.__HRUI_TestCastbar = true
                     end
 
                     local now = GetTime()
 
-                    ns:ResetCastbar(frame)
-                    ns:StartCastbarCast(frame, "Test Spell", 136243, now * 1000, (now + 10) * 1000, false)
+                    for _, frame in ipairs(frames) do
+                        if unit == "target" then
+                            frame.__HRUI_TestCastbar = true
+                        end
+
+                        ns:ResetCastbar(frame)
+                        ns:StartCastbarCast(frame, "Test Spell", 136243, now * 1000, (now + 10) * 1000, false)
+                    end
 
                     if C_Timer and C_Timer.After then
                         C_Timer.After(10.05, function()
-                            if not frame then
-                                return
-                            end
-
-                            if unit == "target" then
-                                if frame.__HRUI_TestCastbar then
-                                    if ns.ResetTargetCastbar then
-                                        ns:ResetTargetCastbar(frame)
+                            for _, frame in ipairs(frames) do
+                                if frame then
+                                    if unit == "target" then
+                                        if frame.__HRUI_TestCastbar then
+                                            if ns.ResetTargetCastbar then
+                                                ns:ResetTargetCastbar(frame)
+                                            else
+                                                frame.__HRUI_TestCastbar = nil
+                                                ns:ResetCastbar(frame)
+                                            end
+                                        end
                                     else
-                                        frame.__HRUI_TestCastbar = nil
                                         ns:ResetCastbar(frame)
                                     end
                                 end
-                            else
-                                ns:ResetCastbar(frame)
+                            end
+
+                            if unit == "boss" and bossPreviewShouldAutoHide and ns.HideBossPreviewFrames then
+                                local moversStillUnlocked = ns.Movers
+                                    and ns.Movers.IsUnlocked
+                                    and ns.Movers:IsUnlocked()
+                                if not moversStillUnlocked then
+                                    ns:HideBossPreviewFrames()
+                                end
                             end
                         end)
                     end
@@ -353,6 +393,7 @@ function ns:CreateCastbarOptions()
             player = { type = "group", name = "플레이어", order = 2, args = CreateCastbarGroup("player", "플레이어").args },
             target = { type = "group", name = "대상", order = 3, args = CreateCastbarGroup("target", "대상").args },
             pet    = { type = "group", name = "소환수", order = 4, args = CreateCastbarGroup("pet", "소환수").args },
+            boss   = { type = "group", name = "보스", order = 5, args = CreateCastbarGroup("boss", "보스").args },
         },
     }
 end

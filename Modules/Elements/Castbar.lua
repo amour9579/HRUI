@@ -1,7 +1,7 @@
 local _, ns = ...
 
 local function GetCastbarStyle(frame)
-    local unit = frame and frame.unit or nil
+    local unit = frame and (frame.castbarStyleUnit or frame.unit) or nil
 
     if ns.GetCastbarStyle then
         return ns:GetCastbarStyle(unit)

@@ -13,8 +13,16 @@ function ns:GetUnitDB(unit)
     return GetRoot("unitframes", unit)
 end
 
+local function NormalizeCastbarUnit(unit)
+    if type(unit) == "string" and unit:match("^boss%d+$") then
+        return "boss"
+    end
+
+    return unit
+end
+
 function ns:GetCastbarDB(unit)
-    return GetRoot("castbars", unit)
+    return GetRoot("castbars", NormalizeCastbarUnit(unit))
 end
 
 local defaultCastbarColors = {

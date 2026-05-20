@@ -51,6 +51,29 @@ local function GetBossDB()
     return db
 end
 
+local function GetBossCastbarDB()
+    return ns.db
+        and ns.db.profile
+        and ns.db.profile.castbars
+        and ns.db.profile.castbars.boss
+end
+
+local function GetBossCastbarStackOffset()
+    local castDB = GetBossCastbarDB()
+    if not castDB or castDB.enabled == false then
+        return 0
+    end
+
+    local barHeight = castDB.height or 18
+    local yOffset = castDB.y
+    if yOffset == nil then
+        yOffset = -4
+    end
+
+    local gapBelow = math.max(0, -yOffset)
+    return barHeight + gapBelow
+end
+
 local function DisableBlizzardBossFrames()
     if InCombatLockdown and InCombatLockdown() then
         return
@@ -296,6 +319,20 @@ local function CreateBossPreviewFrame(parent, index)
     power.bg:SetVertexColor(0.15, 0.15, 0.15, 0.70)
     frame.Power = power
 
+
+    local castbar = CreateFrame("StatusBar", nil, frame, "BackdropTemplate")
+    castbar.unit = "boss"
+    castbar:SetStatusBarTexture(ns.GetTexture and ns:GetTexture() or "Interface\\TARGETINGFRAME\\UI-StatusBar")
+    castbar:SetStatusBarColor(0.95, 0.75, 0.20, 0.95)
+    castbar:SetMinMaxValues(0, 100)
+    castbar:SetValue(65)
+    castbar:SetScript("OnUpdate", function(self)
+        if ns.UpdateCastbar then
+            ns:UpdateCastbar(self)
+        end
+    end)
+    frame.Castbar = castbar
+
     local overlay = CreateFrame("Frame", nil, frame)
     overlay:SetAllPoints(frame)
     overlay:SetFrameLevel(frame:GetFrameLevel() + 10)
@@ -363,6 +400,13 @@ function ns:RefreshBossPreviewFrames()
     local width = db.width or 220
     local height = db.height or 45
     local spacing = db.spacing or DEFAULT_SPACING
+    local castbarDB = GetBossCastbarDB()
+    if castbarDB and castbarDB.enabled ~= false then
+        local castbarWidth = castbarDB.width or width
+        local castbarXOffset = math.abs(castbarDB.x or 0)
+        width = math.max(width, castbarWidth + (castbarXOffset * 2))
+    end
+    local castbarStackOffset = GetBossCastbarStackOffset()
     local texture = ns.GetTexture and ns:GetTexture() or "Interface\\TARGETINGFRAME\\UI-StatusBar"
     local healthMax = 125000000
     local powerMax = 10000
@@ -373,7 +417,7 @@ function ns:RefreshBossPreviewFrames()
         if index == 1 then
             frame:SetPoint("TOP", ns.BossFrame, "TOP", 0, 0)
         else
-            frame:SetPoint("TOP", previews[index - 1], "BOTTOM", 0, -spacing)
+            frame:SetPoint("TOP", previews[index - 1], "BOTTOM", 0, -(spacing + castbarStackOffset))
         end
 
         if frame.Backdrop and ns.ApplyBackdropStyle then
@@ -456,6 +500,41 @@ function ns:RefreshBossPreviewFrames()
             frame.PowerValue:Hide()
         end
 
+
+        local castCfg = GetBossCastbarDB() or {}
+        if frame.Castbar then
+            frame.Castbar:SetStatusBarTexture(texture)
+            frame.Castbar:SetMinMaxValues(0, 100)
+            frame.Castbar:SetValue(65)
+            frame.Castbar:SetStatusBarColor(0.95, 0.75, 0.20, 0.95)
+
+            if ns.CreateCastbar then
+                ns:CreateCastbar(frame.Castbar, castCfg)
+            end
+
+            if ns.ApplyCastbarTextSettings then
+                ns:ApplyCastbarTextSettings(frame.Castbar, castCfg)
+            end
+
+            frame.Castbar:ClearAllPoints()
+            frame.Castbar:SetPoint("TOP", frame, "BOTTOM", castCfg.x or 0, castCfg.y or -4)
+            frame.Castbar:SetSize(castCfg.width or width, castCfg.height or 18)
+
+            if frame.Castbar.Text then
+                frame.Castbar.Text:SetText("암흑의 화살")
+            end
+
+            if frame.Castbar.Time then
+                frame.Castbar.Time:SetText("1.8")
+            end
+
+            if castCfg.enabled ~= false then
+                frame.Castbar:Show()
+            else
+                frame.Castbar:Hide()
+            end
+        end
+
         ApplyPreviewBuffs(frame, db)
         ApplyPreviewDebuffs(frame, db)
 
@@ -535,6 +614,10 @@ function ns:SetBossFramesEnabled(enabled)
         ns:HideBossPreviewFrames()
     end
 
+    if ns.RefreshBossCastbars then
+        ns:RefreshBossCastbars()
+    end
+
     SetBossVisibility(enabled)
 end
 
@@ -548,8 +631,11 @@ function ns:GetBossMoverSize()
     local width = db.width or 220
     local height = db.height or 45
     local spacing = db.spacing or DEFAULT_SPACING
+    local castbarStackOffset = GetBossCastbarStackOffset()
 
-    return width, (height * maxFrames) + (spacing * math.max(maxFrames - 1, 0))
+    return width, (height * maxFrames)
+        + ((spacing + castbarStackOffset) * math.max(maxFrames - 1, 0))
+        + castbarStackOffset
 end
 
 function ns:RefreshBossFrames()
@@ -568,6 +654,7 @@ function ns:RefreshBossFrames()
     local width = db.width or 220
     local height = db.height or 45
     local spacing = db.spacing or DEFAULT_SPACING
+    local castbarStackOffset = GetBossCastbarStackOffset()
     local totalWidth, totalHeight = ns:GetBossMoverSize()
 
     ns.BossFrame:ClearAllPoints()
@@ -581,12 +668,17 @@ function ns:RefreshBossFrames()
         if index == 1 then
             frame:SetPoint("TOP", ns.BossFrame, "TOP", 0, 0)
         else
-            frame:SetPoint("TOP", ns.BossFrames[index - 1], "BOTTOM", 0, -spacing)
+            frame:SetPoint("TOP", ns.BossFrames[index - 1], "BOTTOM", 0, -(spacing + castbarStackOffset))
         end
+
 
         if ns.RefreshFrameElements then
             ns:RefreshFrameElements(frame)
         end
+    end
+
+    if ns.RefreshBossCastbars then
+        ns:RefreshBossCastbars()
     end
 
     SetBossVisibility(enabled)

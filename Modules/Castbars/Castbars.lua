@@ -13,6 +13,7 @@ local spawnOrder = {
     "player",
     "target",
     "pet",
+    "boss",
 }
 
 local function ApplyCastbarTextSettings(frame, db)
@@ -62,6 +63,15 @@ local function ApplyFrameAnchor(key, frame, db)
     frame:SetPoint("CENTER", UIParent, "CENTER", db.x or 0, db.y or 0)
 end
 local function ApplyCastbarSettings(key)
+    if key == "boss" then
+        if ns.RefreshBossFrames then
+            ns:RefreshBossFrames()
+        elseif ns.RefreshBossCastbars then
+            ns:RefreshBossCastbars()
+        end
+        return
+    end
+
     local db = ns.db.profile.castbars[key]
     local frame = GetFrame(key)
 
@@ -114,6 +124,9 @@ function ns.Modules.Castbars:Enable()
     ns:SpawnPlayerCastbar()
     ns:SpawnTargetCastbar()
     ns:SpawnPetCastbar()
+    if ns.SpawnBossCastbars then
+        ns:SpawnBossCastbars()
+    end
 
     if ns.Movers and ns.Movers.CreateAll then
         ns.Movers:CreateAll()
@@ -125,7 +138,7 @@ end
 function ns.Modules.Castbars:RefreshBar(key)
     ApplyCastbarSettings(key)
 
-    if ns.Movers and ns.Movers.RefreshMover then
+    if key ~= "boss" and ns.Movers and ns.Movers.RefreshMover then
         ns.Movers:RefreshMover("castbar_" .. key)
     end
 
