@@ -534,14 +534,6 @@ local function GetCurrentSpecIDAndName()
     return nil, fallbackName
 end
 
-local function GetCurrentEquippedItemLevelNumber()
-    local _, equippedLvl = GetAverageItemLevel()
-
-    equippedLvl = tonumber(equippedLvl) or 0
-
-    return math.floor(equippedLvl + 0.5)
-end
-
 local TIER_SLOTS = {
     1,  -- 머리
     3,  -- 어깨
@@ -677,7 +669,7 @@ function M:BuildPartyResumeMessage()
     local parts = {}
 
     if IsPartyResumeFieldEnabled("showItemLevel") then
-        tinsert(parts, tostring(GetCurrentEquippedItemLevelNumber()))
+        tinsert(parts, GetCurrentEquippedItemLevelText())
     end
 
     if IsPartyResumeFieldEnabled("showTierSet") then
