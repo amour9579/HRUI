@@ -348,7 +348,7 @@ end
 
 local function GetCurrentEquippedItemLevelText()
     local _, equippedLvl = GetAverageItemLevel()
-    return format("%.1f", equippedLvl or 0)
+    return format("%d", math.floor(equippedLvl or 0))
 end
 
 local function GetCurrentDungeonScore()
